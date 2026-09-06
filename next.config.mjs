@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
+  // All pages use client-side Firebase — no SSR issues
+  reactStrictMode: true,
 };
 
 export default nextConfig;

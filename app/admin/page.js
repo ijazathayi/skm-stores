@@ -87,8 +87,9 @@ export default function AdminPage() {
   const {
     inventory, bills, todaySales,
     deleteSale, deleteInventoryItem,
-    milkPrices, updateMilkPrices,
+    milkPrices, updateMilkPrices, lang
   } = useStore();
+  const isTa = lang === 'ta';
 
   // ── auth gate ── (all hooks must come before any early return)
   const [authed, setAuthed] = useState(false);
@@ -130,7 +131,7 @@ export default function AdminPage() {
     // basic validation — reject blank / negative prices
     for (const p of draft) {
       if (p.wp === '' || p.sp === '' || Number(p.wp) < 0 || Number(p.sp) < 0) {
-        setSaveMsg('⚠️ All prices must be 0 or above.');
+        setSaveMsg(isTa ? '⚠️ அனைத்து விலைகளும் 0 அல்லது அதற்கு மேல் இருக்க வேண்டும்.' : '⚠️ All prices must be 0 or above.');
         return;
       }
     }
@@ -146,10 +147,10 @@ export default function AdminPage() {
       await updateMilkPrices(normalised);
       setEditMode(false);
       setDraft([]);
-      setSaveMsg('✅ Prices saved!');
+      setSaveMsg(isTa ? '✅ விலைகள் சேமிக்கப்பட்டன!' : '✅ Prices saved!');
       setTimeout(() => setSaveMsg(''), 3000);
     } catch (err) {
-      setSaveMsg('❌ Save failed: ' + err.message);
+      setSaveMsg(isTa ? '❌ சேமிப்பதில் பிழை: ' + err.message : '❌ Save failed: ' + err.message);
     } finally {
       setSaving(false);
     }
@@ -157,8 +158,8 @@ export default function AdminPage() {
 
   // ── inventory delete all ──
   const deleteAllInventory = async () => {
-    if (!confirm(`Delete ALL ${inventory.length} products? Cannot be undone.`)) return;
-    if (!confirm('Final confirm — delete every product?')) return;
+    if (!confirm(isTa ? `அனைத்து ${inventory.length} பொருட்களையும் நீக்கவா? இதை திரும்பப் பெற முடியாது.` : `Delete ALL ${inventory.length} products? Cannot be undone.`)) return;
+    if (!confirm(isTa ? 'உறுதிசெய்க — அனைத்து பொருட்களையும் நீக்கவா?' : 'Final confirm — delete every product?')) return;
     for (const p of inventory) await deleteInventoryItem(p.id);
   };
 
@@ -171,16 +172,16 @@ export default function AdminPage() {
 
   return (
     <>
-      <Header backHref="/" title="🛡 Admin" />
+      <Header backHref="/" title={isTa ? '🛡 நிர்வாகம்' : '🛡 Admin'} />
       <main className="wrap">
 
         {/* ── Stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 20 }}>
           {[
-            ['Inventory Items', inventory.length],
-            ['Total Sales',     bills.length],
-            ["Today's Sales",   money(todaySales())],
-            ['Revenue',         money(totalRevenue)],
+            [isTa ? 'சரக்கு பொருட்கள்' : 'Inventory Items', inventory.length],
+            [isTa ? 'மொத்த விற்பனைகள்' : 'Total Sales',     bills.length],
+            [isTa ? 'இன்றைய விற்பனை' : "Today's Sales",   money(todaySales())],
+            [isTa ? 'மொத்த வருவாய்' : 'Revenue',         money(totalRevenue)],
           ].map(([l, v]) => (
             <div key={l} className="bill-card">
               <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{l}</div>
@@ -195,9 +196,9 @@ export default function AdminPage() {
           {/* header row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
             <div>
-              <h4 style={{ margin: 0 }}>🥛 Buy Milk Prices</h4>
+              <h4 style={{ margin: 0 }}>{isTa ? '🥛 பால் கொள்முதல் விலை பட்டியல்' : '🥛 Buy Milk Prices'}</h4>
               <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 3 }}>
-                Wholesale Price = used for bill calculations &nbsp;·&nbsp; Price = retail display
+                {isTa ? 'மொத்த விலை (WP) = கொள்முதல் கணக்கீடு · சில்லறை விலை (SP) = விற்பனை விலை' : 'Wholesale Price = used for bill calculations · Price = retail display'}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -210,14 +211,14 @@ export default function AdminPage() {
                 <button
                   onClick={enterEdit}
                   style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                  ✏️ Edit Prices
+                  {isTa ? '✏️ விலையைத் திருத்துக' : '✏️ Edit Prices'}
                 </button>
               ) : (
                 <>
                   <button
                     onClick={cancelEdit}
                     style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: 'var(--ink3)', cursor: 'pointer' }}>
-                    Cancel
+                    {isTa ? 'ரத்து' : 'Cancel'}
                   </button>
                   <button
                     onClick={saveEdit}

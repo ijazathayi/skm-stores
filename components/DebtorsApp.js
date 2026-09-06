@@ -6,6 +6,7 @@ import {
   collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy, writeBatch, getDocs, where
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useStore } from '@/lib/store';
 
 /* ── helpers ── */
 const today = () => new Date().toISOString().slice(0, 10);
@@ -25,6 +26,8 @@ function escapeHtml(s) {
 }
 
 export default function DebtorsApp() {
+  const { lang } = useStore();
+  const isTa = lang === 'ta';
   const [customers, setCustomers] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -138,7 +141,7 @@ export default function DebtorsApp() {
 
   async function deleteCustomer() {
     if (!selectedId || !currentCustomer) return;
-    if (!confirm(`Delete "${currentCustomer.name}" and all their debt/payment entries?`)) return;
+    if (!confirm(isTa ? `"${currentCustomer.name}" மற்றும் அவரது அனைத்து கடன் கணக்குகளையும் நீக்கவா?` : `Delete "${currentCustomer.name}" and all their debt/payment entries?`)) return;
 
     try {
       const cId = selectedId;
@@ -148,40 +151,41 @@ export default function DebtorsApp() {
       await deleteDoc(doc(db, 'debtors_customers', cId));
 
       // Batch delete related entries
-      const entriesQuery = query(collection(db, 'debtors_entries'), where('customerId', '==', cId));
-      const snap = await getDocs(entriesQuery);
+      const entriesSnap = await getDocs(query(collection(db, 'debtors_entries'), where('customerId', '==', cId)));
       const batch = writeBatch(db);
-      snap.docs.forEach((d) => batch.delete(d.ref));
+      entriesSnap.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
     } catch (err) {
       alert('Error deleting customer: ' + err.message);
     }
   }
 
-  /* ── Debt / Payment Actions ── */
+  /* ── Debt / Payment CRUD ── */
   async function addDebt(e) {
     e.preventDefault();
     if (!selectedId || isSubmittingDebt) return;
-    const amt = Number(debtAmount);
-    if (!amt || amt <= 0) return alert('Please enter a valid amount');
+    const amount = Number(debtAmount);
+    if (!amount || amount <= 0) {
+      alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount');
+      return;
+    }
 
     try {
       setIsSubmittingDebt(true);
       await addDoc(collection(db, 'debtors_entries'), {
         customerId: selectedId,
         kind: 'debt',
-        product: debtProduct.trim() || 'Purchase',
-        quantity: debtQty ? Number(debtQty) : null,
-        amount: amt,
-        note: debtNote.trim() || null,
+        product: debtProduct.trim() || '',
+        qty: debtQty.trim() || '',
+        amount,
         date: debtDate || today(),
+        note: debtNote.trim() || '',
         timestamp: new Date().toISOString()
       });
       setDebtProduct('');
       setDebtQty('');
       setDebtAmount('');
       setDebtNote('');
-      setDebtDate(today());
     } catch (err) {
       alert('Error adding debt: ' + err.message);
     } finally {
@@ -192,24 +196,24 @@ export default function DebtorsApp() {
   async function addPayment(e) {
     e.preventDefault();
     if (!selectedId || isSubmittingPay) return;
-    const amt = Number(payAmount);
-    if (!amt || amt <= 0) return alert('Please enter a valid amount');
+    const amount = Number(payAmount);
+    if (!amount || amount <= 0) {
+      alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount');
+      return;
+    }
 
     try {
       setIsSubmittingPay(true);
       await addDoc(collection(db, 'debtors_entries'), {
         customerId: selectedId,
         kind: 'payment',
-        product: null,
-        quantity: null,
-        amount: amt,
-        note: payNote.trim() || null,
+        amount,
         date: payDate || today(),
+        note: payNote.trim() || '',
         timestamp: new Date().toISOString()
       });
       setPayAmount('');
       setPayNote('');
-      setPayDate(today());
     } catch (err) {
       alert('Error recording payment: ' + err.message);
     } finally {
@@ -218,11 +222,24 @@ export default function DebtorsApp() {
   }
 
   async function deleteEntry(entryId) {
+    if (!confirm(isTa ? 'இந்த பதிவை நீக்கவா?' : 'Delete this entry?')) return;
     try {
       await deleteDoc(doc(db, 'debtors_entries', entryId));
     } catch (err) {
       alert('Error deleting entry: ' + err.message);
     }
+  }
+
+  /* ── WhatsApp share ── */
+  function shareWhatsApp() {
+    if (!currentCustomer) return;
+    const bal = getCustomerBalance(currentCustomer.id);
+    const text = isTa
+      ? `வணக்கம் ${currentCustomer.name},\nஎஸ்.கே.எம் ஸ்டோர்ஸில் உங்கள் கடன் நிலுவை தொகை: ${money(bal)}.\nதயவுசெய்து விரைவில் செலுத்தவும். நன்றி!`
+      : `Hello ${currentCustomer.name},\nYour outstanding balance at SKM Stores is ${money(bal)}.\nPlease clear it at your earliest convenience. Thank you!`;
+    const cleanMobile = currentCustomer.mobile.replace(/[^0-9]/g, '');
+    const url = `https://wa.me/${cleanMobile.startsWith('91') ? cleanMobile : '91' + cleanMobile}?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   }
 
   /* ── Ledger calculations ── */
@@ -236,7 +253,10 @@ export default function DebtorsApp() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', color: '#3a2415', fontFamily: 'Figtree, system-ui, sans-serif', background: 'linear-gradient(135deg,#fbe9cf,#f6d3b4 45%,#f2b9ac)', overflowX: 'hidden' }}>
+    <div style={{
+      minHeight: '100dvh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)',
+      color: '#3a2415', fontFamily: 'system-ui, -apple-system, sans-serif'
+    }}>
 
       {/* Glow blobs */}
       <div style={{ position: 'fixed', width: 520, height: 520, right: -140, top: -140, background: 'rgba(224,163,37,.45)', borderRadius: '50%', filter: 'blur(90px)', pointerEvents: 'none', zIndex: 0 }} />
@@ -254,14 +274,16 @@ export default function DebtorsApp() {
             <Image src="/skm-logo.png" alt="SKM Stores" width={44} height={44} style={{ objectFit: 'cover' }} />
           </div>
           <div>
-            <p style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, lineHeight: 1 }}>SKM Stores</p>
+            <p style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, lineHeight: 1 }}>
+              {isTa ? 'எஸ்.கே.எம் ஸ்டோர்ஸ்' : 'SKM Stores'}
+            </p>
             <p style={{ margin: '2px 0 0', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a6a4f' }}>
-              Debtors Book {loading ? '• Loading...' : '• Synced Live'}
+              {isTa ? 'கடன் புத்தகம்' : 'Debtors Book'} {loading ? '• Loading...' : '• Synced Live'}
             </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <Link href="/" style={topbarBtn}>← Home</Link>
+          <Link href="/" style={topbarBtn}>← {isTa ? 'முகப்பு' : 'Home'}</Link>
         </div>
       </header>
 
@@ -270,10 +292,10 @@ export default function DebtorsApp() {
         {/* Stats */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
           {[
-            ['Total outstanding', money(statOutstanding)],
-            ['Open accounts', String(statOpen)],
-            ['Credit given', money(totalDebt)],
-            ['Repayments', money(totalPaid)],
+            [isTa ? 'மொத்த நிலுவை' : 'Total outstanding', money(statOutstanding)],
+            [isTa ? 'நிலுவை கணக்குகள்' : 'Open accounts', String(statOpen)],
+            [isTa ? 'வழங்கப்பட்ட கடன்' : 'Credit given', money(totalDebt)],
+            [isTa ? 'பெறப்பட்ட தொகை' : 'Repayments', money(totalPaid)],
           ].map(([label, val]) => (
             <div key={label} style={cardStyle}>
               <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>{label}</p>
@@ -287,19 +309,21 @@ export default function DebtorsApp() {
 
           {/* Left: customer list */}
           <section style={cardStyle}>
-            <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>Customers</h2>
+            <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>
+              {isTa ? 'வாடிக்கையாளர்கள்' : 'Customers'}
+            </h2>
             <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer name" required style={fieldStyle} />
-              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder="Mobile number" inputMode="tel" pattern="[0-9 +\-]{6,15}" required style={fieldStyle} />
+              <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
+              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண்' : 'Mobile number'} inputMode="tel" pattern="[0-9 +\-]{6,15}" required style={fieldStyle} />
               <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
-                {isSubmittingCust ? 'Registering...' : 'Register customer'}
+                {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Register customer')}
               </button>
             </form>
-            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search name or mobile" style={{ ...fieldStyle, margin: '14px 0 10px', width: '100%' }} />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={isTa ? 'பெயர் அல்லது அலைபேசியைத் தேடுங்கள்' : 'Search name or mobile'} style={{ ...fieldStyle, margin: '14px 0 10px', width: '100%' }} />
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
               {filteredList.length === 0 ? (
                 <li style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>
-                  {loading ? 'Loading customers...' : 'No customers found.'}
+                  {loading ? (isTa ? 'வாடிக்கையாளர் விவரங்கள் ஏற்றப்படுகிறது…' : 'Loading customers...') : (isTa ? 'வாடிக்கையாளர்கள் யாரும் இல்லை.' : 'No customers found.')}
                 </li>
               ) : filteredList.map(({ c, bal }) => (
                 <li key={c.id}>

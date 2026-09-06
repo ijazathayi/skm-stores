@@ -3,12 +3,13 @@ import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
 import { printReceipt } from '@/lib/printReceipt';
+import { getProductName } from '@/lib/translations';
 
 /* Group bills array into { "Sunday, 6 Sep 2026": [bill, …], … } */
-function groupByDate(bills) {
+function groupByDate(bills, isTa) {
   const groups = {};
   bills.forEach((b) => {
-    const label = new Date(b.timestamp).toLocaleDateString('en-GB', {
+    const label = new Date(b.timestamp).toLocaleDateString(isTa ? 'ta-IN' : 'en-GB', {
       weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
     });
     if (!groups[label]) groups[label] = [];
@@ -18,26 +19,27 @@ function groupByDate(bills) {
 }
 
 export default function HistoryPage() {
-  const { bills, todaySales, storeProfile } = useStore();
+  const { bills, todaySales, storeProfile, lang } = useStore();
+  const isTa = lang === 'ta';
 
   const printBill = (b) => {
     if (typeof window !== 'undefined') {
-      printReceipt(b, storeProfile);
+      printReceipt(b, storeProfile, { lang });
     }
   };
 
-  const grouped = groupByDate(bills);
+  const grouped = groupByDate(bills, isTa);
 
   return (
     <>
-      <Header backHref="/" title="📊 Sales" />
+      <Header backHref="/" title={isTa ? '📊 விற்பனை வரலாறு' : '📊 Sales'} />
       <main className="wrap">
         {bills.length === 0 ? (
-          <div className="empty-box">No sales recorded yet.</div>
+          <div className="empty-box">{isTa ? 'விற்பனை பதிவுகள் எதுவும் இல்லை.' : 'No sales recorded yet.'}</div>
         ) : (
           <>
             <div style={{ fontSize: 12.5, color: 'var(--ink3)', marginBottom: 14 }}>
-              {bills.length} bills recorded · Today&apos;s sales {money(todaySales())}
+              {bills.length} {isTa ? 'ரசீதுகள் பதிவு செய்யப்பட்டுள்ளது' : 'bills recorded'} · {isTa ? 'இன்றைய விற்பனை' : "Today's sales"} {money(todaySales())}
             </div>
 
             {Object.entries(grouped).map(([dateLabel, dayBills]) => {
@@ -53,7 +55,7 @@ export default function HistoryPage() {
                   }}>
                     <span style={{ fontWeight: 700, fontSize: 13 }}>📅 {dateLabel}</span>
                     <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.9 }}>
-                      {dayBills.length} bill{dayBills.length !== 1 ? 's' : ''} · {money(dayTotal)}
+                      {dayBills.length} {isTa ? 'ரசீதுகள்' : `bill${dayBills.length !== 1 ? 's' : ''}`} · {money(dayTotal)}
                     </span>
                   </div>
 
@@ -77,11 +79,11 @@ export default function HistoryPage() {
                         </span>
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>
-                        {(b.items || []).length} items
+                        {(b.items || []).length} {isTa ? 'பொருட்கள்' : 'items'}
                       </div>
                       <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontFamily: 'monospace', fontSize: 11.5, color: 'var(--ink2)' }}>
                         {(b.items || []).map((it, i) => (
-                          <span key={i}>{it.name} × {it.qty} @ {money(it.price)}</span>
+                          <span key={i}>{getProductName(it, lang)} × {it.qty} @ {money(it.price)}</span>
                         ))}
                       </div>
                     </div>

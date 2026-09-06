@@ -4,17 +4,22 @@ import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, generateProductId } from '@/lib/helpers';
 import { exportInventory, parseImportFile } from '@/lib/inventoryExcel';
+import { getProductName } from '@/lib/translations';
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const CAT_OPTIONS = [{ value: 'auto', label: 'Auto Detect' }, ...STORE_CATEGORIES.map((c) => ({ value: c.id, label: `${c.icon} ${c.label}` }))];
-
 export default function InventoryPage() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useStore();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, lang } = useStore();
+  const isTa = lang === 'ta';
   const [search,   setSearch]   = useState('');
   const [sortMode, setSortMode] = useState('id');
   const [editItem, setEditItem] = useState(null);
   const [form,     setForm]     = useState({ name: '', altName: '', price: '', unit: 'both', category: 'auto' });
+
+  const CAT_OPTIONS = [
+    { value: 'auto', label: isTa ? 'தானியங்கி (Auto Detect)' : 'Auto Detect' },
+    ...STORE_CATEGORIES.map((c) => ({ value: c.id, label: `${c.icon} ${isTa && c.labelTa ? c.labelTa : c.label}` }))
+  ];
 
   // ── import state ──
   const fileInputRef            = useRef(null);
@@ -25,7 +30,7 @@ export default function InventoryPage() {
   const filtered = inventory
     .filter((p) => matchesSearch(p, search))
     .sort((a, b) => {
-      if (sortMode === 'az')         return (a.name || '').localeCompare(b.name || '');
+      if (sortMode === 'az')         return (getProductName(a, lang) || '').localeCompare(getProductName(b, lang) || '');
       if (sortMode === 'price-asc')  return (Number(a.price) || 0) - (Number(b.price) || 0);
       if (sortMode === 'price-desc') return (Number(b.price) || 0) - (Number(a.price) || 0);
       const aId = a.productId ? a.productId.replace(/\D/g, '') : 9999;
@@ -57,7 +62,7 @@ export default function InventoryPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { alert('Name required'); return; }
+    if (!form.name.trim()) { alert(isTa ? 'பெயர் கட்டாயம்' : 'Name required'); return; }
 
     const oldCatId = getProductCategory(editItem);
     const newCatId = form.category && form.category !== 'auto' ? form.category : oldCatId;
@@ -109,7 +114,7 @@ export default function InventoryPage() {
 
   // ── export ──
   const handleExport = () => {
-    if (inventory.length === 0) { alert('No products to export.'); return; }
+    if (inventory.length === 0) { alert(isTa ? 'ஏற்றுமதி செய்ய பொருட்கள் இல்லை.' : 'No products to export.'); return; }
     exportInventory(inventory);
   };
 
@@ -118,76 +123,99 @@ export default function InventoryPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = ''; // reset so same file can be re-picked
-    setImportMsg('');
-    setImporting(true);
+
     try {
-      const result = await parseImportFile(file, inventory);
-      setImportPreview(result);
+      setImporting(true);
+      setImportMsg(isTa ? 'கோப்பு படிக்கப்படுகிறது…' : 'Parsing file…');
+      const preview = await parseImportFile(file, inventory);
+      setImportPreview(preview);
+      setImportMsg('');
     } catch (err) {
-      setImportMsg('❌ ' + err.message);
+      setImportMsg(isTa ? `❌ இறக்குமதி பிழை: ${err.message}` : `❌ Import error: ${err.message}`);
     } finally {
       setImporting(false);
     }
   };
 
-  // ── confirm import ──
+  // ── user confirmed import preview → apply updates ──
   const confirmImport = async () => {
     if (!importPreview) return;
-    const { toUpdate, toAdd } = importPreview;
     setImporting(true);
-    setImportMsg('');
+    setImportMsg(isTa ? 'பொருட்கள் சேமிக்கப்படுகிறது…' : 'Saving products…');
+
     try {
-      // Updates
-      for (const { firestoreId, updates } of toUpdate) {
-        await updateInventoryItem(firestoreId, updates);
+      const { toUpdate, toAdd } = importPreview;
+
+      // Update existing items
+      for (const item of toUpdate) {
+        const updates = {
+          name: item.name,
+          altName: item.altName,
+          unit: item.unit,
+          category: item.category,
+        };
+        if (item.price != null && !isNaN(item.price)) {
+          updates.price = Number(item.price);
+        }
+        await updateInventoryItem(item.existingId, updates);
       }
-      // Adds — use productId from file as the Firestore doc ID so it stays unique
+
+      // Add new items
       for (const item of toAdd) {
-        const { productId, ...rest } = item;
-        await setDoc(doc(db, 'inventory', productId), { productId, ...rest });
+        const data = {
+          productId: item.productId,
+          name: item.name,
+          altName: item.altName,
+          unit: item.unit,
+          category: item.category,
+        };
+        if (item.price != null && !isNaN(item.price)) {
+          data.price = Number(item.price);
+        }
+        await setDoc(doc(db, 'inventory', item.productId), data);
       }
-      setImportMsg(`✅ Done! ${toUpdate.length} updated · ${toAdd.length} added`);
+
+      setImportMsg(isTa ? `✓ ${toUpdate.length + toAdd.length} பொருட்கள் வெற்றிகரமாக இறக்குமதி செய்யப்பட்டன!` : `✓ Successfully imported ${toUpdate.length + toAdd.length} products!`);
       setImportPreview(null);
+      setTimeout(() => setImportMsg(''), 4000);
     } catch (err) {
-      setImportMsg('❌ Import failed: ' + err.message);
+      setImportMsg(isTa ? `❌ சேமிப்பதில் பிழை: ${err.message}` : `❌ Failed to save: ${err.message}`);
     } finally {
       setImporting(false);
     }
   };
 
-  const cancelImport = () => { setImportPreview(null); setImportMsg(''); };
+  const cancelImport = () => {
+    setImportPreview(null);
+    setImportMsg('');
+  };
 
   return (
     <>
-      <Header backHref="/" title="📦 Inventory" />
+      <Header backHref="/" title={isTa ? '📦 சரக்கு இருப்பு' : '📦 Inventory'} />
       <main className="wrap">
-
-        {/* ── Export / Import toolbar ── */}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Export */}
+        {/* ── Top action buttons ── */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           <button
             onClick={handleExport}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: '#2F5233', color: '#fff', border: 'none',
-              borderRadius: 9, padding: '10px 18px', fontSize: 13,
-              fontWeight: 700, cursor: 'pointer', minHeight: 44,
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600,
+              color: 'var(--ink)', cursor: 'pointer',
             }}>
-            ⬇️ Export Excel
+            📥 {isTa ? 'எக்செல் பதிவிறக்கம்' : 'Export Excel'}
           </button>
-
-          {/* Import */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={importing}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              background: '#0056b3', color: '#fff', border: 'none',
-              borderRadius: 9, padding: '10px 18px', fontSize: 13,
-              fontWeight: 700, cursor: importing ? 'not-allowed' : 'pointer',
-              minHeight: 44, opacity: importing ? 0.6 : 1,
+              background: 'var(--card)', border: '1px solid var(--border)',
+              borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600,
+              color: 'var(--ink)', cursor: importing ? 'not-allowed' : 'pointer',
             }}>
-            {importing ? '⏳ Reading…' : '⬆️ Import Excel'}
+            📤 {importing ? (isTa ? 'இறக்குமதி ஆகிறது…' : 'Importing…') : (isTa ? 'எக்செல் இறக்குமதி' : 'Import Excel')}
           </button>
           <input
             ref={fileInputRef}
@@ -196,115 +224,16 @@ export default function InventoryPage() {
             style={{ display: 'none' }}
             onChange={handleFilePicked}
           />
-
-          {importMsg && (
-            <span style={{
-              fontSize: 13, fontWeight: 700,
-              color: importMsg.startsWith('✅') ? 'var(--primary-dark)' : 'var(--danger)',
-            }}>
-              {importMsg}
-            </span>
-          )}
         </div>
 
-        {/* ── Import preview / confirm ── */}
-        {importPreview && (
+        {/* ── Import message / preview ── */}
+        {importMsg && (
           <div style={{
-            background: 'var(--card)', border: '1.5px solid var(--border)',
-            borderRadius: 12, padding: '16px 18px', marginBottom: 18,
+            background: importMsg.startsWith('❌') ? '#fdecea' : '#E8F0E6',
+            color: importMsg.startsWith('❌') ? 'var(--danger)' : 'var(--primary-dark)',
+            borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600,
           }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>
-              📋 Import Preview
-            </div>
-            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginBottom: 12 }}>
-              <span style={{ fontSize: 13 }}>
-                🔄 <b>{importPreview.toUpdate.length}</b> products will be <b>updated</b>
-              </span>
-              <span style={{ fontSize: 13 }}>
-                ➕ <b>{importPreview.toAdd.length}</b> products will be <b>added</b>
-              </span>
-              <span style={{ fontSize: 13, color: 'var(--ink3)' }}>
-                ⏭ {importPreview.skipped} rows skipped (blank / headers)
-              </span>
-            </div>
-
-            {/* show first 8 rows of each bucket as a sample */}
-            {importPreview.toUpdate.length > 0 && (
-              <details style={{ marginBottom: 8 }}>
-                <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: 'var(--ink3)' }}>
-                  Show updates ({importPreview.toUpdate.length})
-                </summary>
-                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {importPreview.toUpdate.slice(0, 8).map(({ productId, updates }) => (
-                    <div key={productId} style={{
-                      fontSize: 12, background: 'var(--paper)',
-                      borderRadius: 6, padding: '4px 10px',
-                      display: 'flex', gap: 10, flexWrap: 'wrap',
-                    }}>
-                      <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>#{productId}</span>
-                      <span>{updates.name}</span>
-                      {updates.price != null && <span>₹{Number(updates.price).toFixed(2)}</span>}
-                      <span style={{ color: 'var(--ink3)' }}>{updates.unit}</span>
-                    </div>
-                  ))}
-                  {importPreview.toUpdate.length > 8 && (
-                    <div style={{ fontSize: 12, color: 'var(--ink3)' }}>
-                      … and {importPreview.toUpdate.length - 8} more
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            {importPreview.toAdd.length > 0 && (
-              <details style={{ marginBottom: 8 }}>
-                <summary style={{ fontSize: 12, fontWeight: 700, cursor: 'pointer', color: 'var(--ink3)' }}>
-                  Show new products ({importPreview.toAdd.length})
-                </summary>
-                <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  {importPreview.toAdd.slice(0, 8).map((item) => (
-                    <div key={item.productId} style={{
-                      fontSize: 12, background: '#E8F0E6',
-                      borderRadius: 6, padding: '4px 10px',
-                      display: 'flex', gap: 10, flexWrap: 'wrap',
-                    }}>
-                      <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>#{item.productId}</span>
-                      <span>{item.name}</span>
-                      {item.price != null && <span>₹{Number(item.price).toFixed(2)}</span>}
-                      <span style={{ color: 'var(--ink3)' }}>{item.unit}</span>
-                    </div>
-                  ))}
-                  {importPreview.toAdd.length > 8 && (
-                    <div style={{ fontSize: 12, color: 'var(--ink3)' }}>
-                      … and {importPreview.toAdd.length - 8} more
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button
-                onClick={confirmImport}
-                disabled={importing}
-                style={{
-                  background: 'var(--primary)', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '9px 22px', fontSize: 13,
-                  fontWeight: 700, cursor: importing ? 'not-allowed' : 'pointer',
-                  opacity: importing ? 0.6 : 1,
-                }}>
-                {importing ? '⏳ Saving…' : '✅ Confirm Import'}
-              </button>
-              <button
-                onClick={cancelImport}
-                style={{
-                  background: 'transparent', border: '1px solid var(--border)',
-                  borderRadius: 8, padding: '9px 18px', fontSize: 13,
-                  fontWeight: 600, color: 'var(--ink3)', cursor: 'pointer',
-                }}>
-                Cancel
-              </button>
-            </div>
+            {importMsg}
           </div>
         )}
 
@@ -313,7 +242,7 @@ export default function InventoryPage() {
           <div className="search-row" style={{ minHeight: 48 }}>
             <span style={{ fontSize: 17 }}>🔍</span>
             <input
-              placeholder="Search products…"
+              placeholder={isTa ? 'சரக்கு பொருட்களைத் தேடுங்கள்…' : 'Search products…'}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoComplete="off"
@@ -326,29 +255,36 @@ export default function InventoryPage() {
 
         {/* ── Add form ── */}
         <div className="inv-add-grid">
-          <input placeholder="English name (e.g. Tomato)"     value={form.name}    onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input placeholder="தமிழ் பெயர் (optional)"         value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
-          <input type="text" inputMode="decimal" placeholder="Price ₹" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <input placeholder={isTa ? "பெயர் (English, e.g. Tomato)" : "English name (e.g. Tomato)"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <input placeholder={isTa ? "தமிழ் பெயர் (எ.கா. தக்காளி)" : "தமிழ் பெயர் (optional)"} value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
+          <input type="text" inputMode="decimal" placeholder={isTa ? "விலை ₹" : "Price ₹"} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
           <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-            <option value="pcs">PCS</option>
-            <option value="kg">KG</option>
-            <option value="both">BOTH</option>
+            <option value="pcs">{isTa ? 'எண்ணிக்கை (PCS)' : 'PCS'}</option>
+            <option value="kg">{isTa ? 'கிலோ (KG)' : 'KG'}</option>
+            <option value="both">{isTa ? 'இரண்டும் (BOTH)' : 'BOTH'}</option>
           </select>
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ gridColumn: '1 / -1' }}>
             {CAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="add-row">
-          <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>+ Add Product</button>
+          <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>
+            {isTa ? '+ பொருள் சேர்க்க' : '+ Add Product'}
+          </button>
         </div>
 
         {/* ── Sort bar ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 12, color: 'var(--ink3)', fontWeight: 600 }}>
-            {filtered.length}{search ? ` of ${inventory.length}` : ''} items · Sort:
+            {filtered.length}{search ? ` / ${inventory.length}` : ''} {isTa ? 'பொருட்கள்' : 'items'} · {isTa ? 'வரிசைப்படுத்து:' : 'Sort:'}
           </span>
           <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 999, background: 'var(--card)', overflow: 'hidden' }}>
-            {[['id', '#ID'], ['az', 'A–Z'], ['price-asc', '₹↑'], ['price-desc', '₹↓']].map(([m, l]) => (
+            {[
+              ['id', '#ID'],
+              ['az', isTa ? 'அ–ஔ' : 'A–Z'],
+              ['price-asc', '₹↑'],
+              ['price-desc', '₹↓']
+            ].map(([m, l]) => (
               <button key={m} onClick={() => setSortMode(m)} style={{
                 border: 'none', padding: '6px 13px', fontSize: 12.5, fontWeight: 700,
                 cursor: 'pointer', whiteSpace: 'nowrap',
@@ -361,11 +297,12 @@ export default function InventoryPage() {
 
         {/* ── Product list ── */}
         {filtered.length === 0 ? (
-          <div className="empty-box">No products found.</div>
+          <div className="empty-box">{isTa ? 'பொருட்கள் எதுவும் கிடைக்கவில்லை.' : 'No products found.'}</div>
         ) : (
           <div className="inv-list">
             {filtered.map((p) => {
               const cat = STORE_CATEGORIES.find((c) => c.id === getProductCategory(p));
+              const displayName = getProductName(p, lang);
               return (
                 <div key={p.id} className="inv-row">
                   <div style={{ flex: 1 }}>
@@ -375,22 +312,27 @@ export default function InventoryPage() {
                           #{p.productId}
                         </span>
                       )}
-                      <span style={{ fontWeight: 500 }}>{p.name}</span>
+                      <span style={{ fontWeight: 600 }}>{displayName}</span>
+                      {displayName !== p.name && (
+                        <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 400 }}>({p.name})</span>
+                      )}
                       {p.price
                         ? <span style={{ background: 'var(--primary)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>₹{Number(p.price).toFixed(2)}</span>
-                        : <span style={{ color: 'var(--ink3)', fontSize: 11 }}>No price</span>
+                        : <span style={{ color: 'var(--ink3)', fontSize: 11 }}>{isTa ? 'விலை இல்லை' : 'No price'}</span>
                       }
-                      <span style={{ background: '#E8F0E6', color: 'var(--primary-dark)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>{p.unit || 'both'}</span>
+                      <span style={{ background: '#E8F0E6', color: 'var(--primary-dark)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                        {isTa ? (p.unit === 'kg' ? 'கிலோ' : (p.unit === 'pcs' ? 'எண்ணிக்கை' : 'இரண்டும்')) : (p.unit || 'both')}
+                      </span>
                       {cat && (
                         <span style={{ background: '#F1F0E4', color: 'var(--ink2)', padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
-                          {cat.icon} {cat.label}
+                          {cat.icon} {isTa && cat.labelTa ? cat.labelTa : cat.label}
                         </span>
                       )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button className="icon-btn" onClick={() => openEdit(p)}>✎</button>
-                    <button className="icon-btn" onClick={() => { if (confirm('Delete this product?')) deleteInventoryItem(p.id); }}>🗑</button>
+                    <button className="icon-btn" onClick={() => { if (confirm(isTa ? 'இந்த பொருளை நீக்கவா?' : 'Delete this product?')) deleteInventoryItem(p.id); }}>🗑</button>
                   </div>
                 </div>
               );
@@ -404,15 +346,17 @@ export default function InventoryPage() {
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setEditItem(null); }}>
           <div className="modal-box">
             <div className="modal-head">
-              <h3 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: 16, fontWeight: 700 }}>✎ Edit Product</h3>
+              <h3 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: 16, fontWeight: 700 }}>
+                {isTa ? '✎ பொருளைத் திருத்துக' : '✎ Edit Product'}
+              </h3>
               <button className="drawer-close" onClick={() => setEditItem(null)}>✕</button>
             </div>
             <div className="modal-body">
               {[
-                ['productId', 'Product ID',      'e.g. PC001'],
-                ['name',      'Name (English)',   'e.g. Tomato'],
-                ['altName',   'Tamil name',       'e.g. தக்காளி'],
-                ['price',     'Price ₹',          'e.g. 50'],
+                ['productId', isTa ? 'பொருள் எண் (ID)' : 'Product ID', 'e.g. PC001'],
+                ['name',      isTa ? 'பெயர் (English)' : 'Name (English)', 'e.g. Tomato'],
+                ['altName',   isTa ? 'தமிழ் பெயர்' : 'Tamil name', 'e.g. தக்காளி'],
+                ['price',     isTa ? 'விலை ₹' : 'Price ₹', 'e.g. 50'],
               ].map(([k, l, ph]) => (
                 <div key={k} className="modal-field">
                   <label>{l}</label>
@@ -426,50 +370,26 @@ export default function InventoryPage() {
                 </div>
               ))}
               <div className="modal-field">
-                <label>Unit</label>
+                <label>{isTa ? 'அளவு முறை' : 'Unit'}</label>
                 <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-                  <option value="pcs">PCS</option>
-                  <option value="kg">KG</option>
-                  <option value="both">BOTH</option>
+                  <option value="pcs">{isTa ? 'எண்ணிக்கை (PCS)' : 'PCS'}</option>
+                  <option value="kg">{isTa ? 'கிலோ (KG)' : 'KG'}</option>
+                  <option value="both">{isTa ? 'இரண்டும் (BOTH)' : 'BOTH'}</option>
                 </select>
               </div>
               <div className="modal-field">
-                <label>Category</label>
+                <label>{isTa ? 'பிரிவு' : 'Category'}</label>
                 <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
                   {STORE_CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                    <option key={c.id} value={c.id}>{c.icon} {isTa && c.labelTa ? c.labelTa : c.label}</option>
                   ))}
                 </select>
-                {/* Show current product ID + preview of new ID if category changes */}
-                {(() => {
-                  const oldCat = getProductCategory(editItem);
-                  const newCat = form.category && form.category !== 'auto' ? form.category : oldCat;
-                  const changing = newCat !== oldCat;
-                  const allIds = inventory
-                    .filter((p) => p.id !== editItem?.id)
-                    .map((p) => p.productId).filter(Boolean);
-                  const previewId = changing ? generateProductId(newCat, allIds) : null;
-                  return (
-                    <div style={{ marginTop: 6, fontSize: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      <span style={{ color: 'var(--ink3)' }}>
-                        Current ID: <b style={{ fontFamily: 'monospace' }}>#{editItem?.productId || '—'}</b>
-                      </span>
-                      {changing && previewId && (
-                        <span style={{ color: 'var(--primary-dark)', fontWeight: 700 }}>
-                          → New ID: <span style={{ fontFamily: 'monospace' }}>#{previewId}</span>
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn-cancel" onClick={() => setEditItem(null)}>Cancel</button>
+              <button className="btn-cancel" onClick={() => setEditItem(null)}>{isTa ? 'ரத்து' : 'Cancel'}</button>
               <button className="btn-save"   onClick={handleSave}>
-                {editItem && getProductCategory(editItem) !== (form.category && form.category !== 'auto' ? form.category : getProductCategory(editItem))
-                  ? '🔄 Change Category & Save'
-                  : 'Save changes'}
+                {isTa ? 'சேமி' : 'Save changes'}
               </button>
             </div>
           </div>

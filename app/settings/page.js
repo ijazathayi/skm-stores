@@ -6,7 +6,8 @@ import { useStore } from '@/lib/store';
 const LS = (k, def) => typeof window !== 'undefined' ? (localStorage.getItem(k) || def) : def;
 
 export default function SettingsPage() {
-  const { storeProfile, updateStoreProfile } = useStore();
+  const { storeProfile, updateStoreProfile, lang, setLang } = useStore();
+  const isTa = lang === 'ta';
 
   // ── store profile fields (seeded from Firestore via store) ──
   const [storeName,     setStoreName]     = useState('SKM STORES');
@@ -14,7 +15,7 @@ export default function SettingsPage() {
   const [storeAddress,  setStoreAddress]  = useState('');
   const [receiptFooter, setReceiptFooter] = useState('THANK YOU VISIT AGAIN');
 
-  // ── print / lang settings (local only) ──
+  // ── print / lang settings ──
   const [printWidth, setPrintWidth] = useState(58);
   const [printLang,  setPrintLang]  = useState('en');
 
@@ -46,7 +47,7 @@ export default function SettingsPage() {
   // Seed print settings from localStorage fallback
   useEffect(() => {
     const savedWidth = Number(LS('skm_printWidth', '58')) || 58;
-    const savedLang = LS('skm_printLang', 'en');
+    const savedLang = LS('skm_lang', LS('skm_printLang', 'en'));
     setPrintWidth(savedWidth);
     setPrintLang(savedLang);
   }, []);
@@ -60,56 +61,51 @@ export default function SettingsPage() {
         storeName: storeName.trim() || 'SKM STORES',
         storePhone: storePhone.trim(),
         storeAddress: storeAddress.trim(),
-        receiptFooter: receiptFooter.trim() || 'THANK YOU VISIT AGAIN',
+        receiptFooter: receiptFooter.trim() || (isTa ? 'நன்றி மீண்டும் வருக!' : 'THANK YOU VISIT AGAIN'),
         printWidth,
         printLang
       });
-      flash('✓ Store profile saved to cloud!');
+      flash(isTa ? '✓ கடை விவரங்கள் சேமிக்கப்பட்டன!' : '✓ Store profile saved to cloud!');
     } catch (err) {
-      flash('❌ Save failed: ' + err.message);
+      flash(isTa ? '❌ சேமிப்பதில் பிழை: ' + err.message : '❌ Save failed: ' + err.message);
     }
   };
 
   /* ── Print width ── */
   const savePrintWidth = async (w) => {
     const v = Number(w);
-    if (!v || v < 40 || v > 120) { alert('Enter 40–120 mm'); return; }
+    if (!v || v < 40 || v > 120) { alert(isTa ? '40 முதல் 120 மிமீ வரை உள்ளிடவும்' : 'Enter 40–120 mm'); return; }
     setPrintWidth(v);
     if (typeof window !== 'undefined') localStorage.setItem('skm_printWidth', v);
     try {
       await updateStoreProfile({ printWidth: v });
-      flash('✓ Paper width saved (' + v + ' mm)!');
+      flash(isTa ? `✓ தாள் அகலம் (${v} mm) சேமிக்கப்பட்டது!` : `✓ Paper width saved (${v} mm)!`);
     } catch (err) {
-      flash('✓ Width saved locally');
+      flash(isTa ? '✓ அகலம் சேமிக்கப்பட்டது' : '✓ Width saved locally');
     }
   };
 
   /* ── Print Language ── */
   const changePrintLang = async (l) => {
     setPrintLang(l);
-    if (typeof window !== 'undefined') localStorage.setItem('skm_printLang', l);
-    try {
-      await updateStoreProfile({ printLang: l });
-      flash(`✓ Language set to ${l === 'ta' ? 'தமிழ் (Tamil)' : 'English'}!`);
-    } catch (err) {
-      flash('✓ Language saved locally');
-    }
+    setLang(l);
+    flash(l === 'ta' ? '✓ மொழி: தமிழ் (Tamil) மாற்றப்பட்டது!' : '✓ Language set to English!');
   };
 
   /* ── Admin password (localStorage only) ── */
   const changePwd = () => {
     const stored = LS('skm_adminPassword', 'skm@ijaz');
-    if (curPwd !== stored)  { alert('Current password incorrect'); return; }
-    if (!newPwd)            { alert('New password cannot be empty'); return; }
-    if (newPwd !== conPwd)  { alert('Passwords do not match'); return; }
+    if (curPwd !== stored)  { alert(isTa ? 'தற்போதைய கடவுச்சொல் தவறானது' : 'Current password incorrect'); return; }
+    if (!newPwd)            { alert(isTa ? 'புதிய கடவுச்சொல் காலியாக இருக்கக்கூடாது' : 'New password cannot be empty'); return; }
+    if (newPwd !== conPwd)  { alert(isTa ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match'); return; }
     localStorage.setItem('skm_adminPassword', newPwd);
     setCurPwd(''); setNewPwd(''); setConPwd('');
-    flash('✓ Password updated!');
+    flash(isTa ? '✓ கடவுச்சொல் மாற்றப்பட்டது!' : '✓ Password updated!');
   };
 
   return (
     <>
-      <Header backHref="/" title="⚙ Settings" />
+      <Header backHref="/" title={isTa ? '⚙ அமைப்புகள்' : '⚙ Settings'} />
       <main className="wrap">
         {saved && (
           <div style={{
@@ -123,15 +119,15 @@ export default function SettingsPage() {
 
         {/* ── Store Profile ── */}
         <div className="settings-card">
-          <h4>🏪 Store Profile</h4>
+          <h4>🏪 {isTa ? 'கடை விவரங்கள்' : 'Store Profile'}</h4>
           <p style={{ fontSize: 12, color: 'var(--ink3)', margin: '4px 0 14px' }}>
-            Saved to cloud — printed on every receipt.
+            {isTa ? 'மேகக்கணியில் சேமிக்கப்பட்டு ஒவ்வொரு ரசீதிலும் அச்சிடப்படும்.' : 'Saved to cloud — printed on every receipt.'}
           </p>
           {[
-            ['Store Name',      storeName,     setStoreName],
-            ['Phone / Mobile',  storePhone,    setStorePhone],
-            ['Address',         storeAddress,  setStoreAddress],
-            ['Receipt Footer',  receiptFooter, setReceiptFooter],
+            [isTa ? 'கடை பெயர்' : 'Store Name',      storeName,     setStoreName],
+            [isTa ? 'தொலைபேசி / அலைபேசி' : 'Phone / Mobile',  storePhone,    setStorePhone],
+            [isTa ? 'முகவரி' : 'Address',         storeAddress,  setStoreAddress],
+            [isTa ? 'ரசீது முடிவு வாசகம்' : 'Receipt Footer',  receiptFooter, setReceiptFooter],
           ].map(([l, v, s]) => (
             <div key={l} className="setting-field">
               <label>{l}</label>
@@ -139,15 +135,15 @@ export default function SettingsPage() {
             </div>
           ))}
           <button className="btn-primary" style={{ width: '100%', marginTop: 4 }} onClick={saveStore}>
-            Save Settings
+            {isTa ? 'அமைப்புகளைச் சேமி' : 'Save Settings'}
           </button>
         </div>
 
         {/* ── Print Settings ── */}
         <div className="settings-card">
-          <h4>🖨 Print Settings</h4>
+          <h4>🖨 {isTa ? 'பிரின்டர் மற்றும் மொழி அமைப்புகள்' : 'Print & Language Settings'}</h4>
           <div className="setting-field" style={{ marginBottom: 14 }}>
-            <label>Paper Width (mm)</label>
+            <label>{isTa ? 'தாள் அகலம் (Paper Width mm)' : 'Paper Width (mm)'}</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               {[58, 72, 80].map((w) => (
                 <button key={w} onClick={() => savePrintWidth(w)} style={{
@@ -170,18 +166,18 @@ export default function SettingsPage() {
                 className="btn-primary"
                 style={{ padding: '8px 18px', fontSize: 13, minHeight: 40 }}
                 onClick={() => savePrintWidth(printWidth)}>
-                Save
+                {isTa ? 'சேமி' : 'Save'}
               </button>
             </div>
           </div>
           <div className="setting-field">
-            <label>Receipt Language</label>
-            <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
+            <label>{isTa ? 'செயலி மற்றும் ரசீது மொழி' : 'App & Receipt Language'}</label>
+            <div style={{ display: 'inline-flex', border: '1.5px solid var(--primary)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
               {[['en', 'English'], ['ta', 'தமிழ்']].map(([l, name]) => (
                 <button key={l} onClick={() => changePrintLang(l)} style={{
-                  border: 'none', padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  background: printLang === l ? 'var(--primary)' : 'transparent',
-                  color: printLang === l ? '#fff' : 'var(--ink3)',
+                  border: 'none', padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  background: (lang || printLang) === l ? 'var(--primary)' : 'transparent',
+                  color: (lang || printLang) === l ? '#fff' : 'var(--ink3)',
                 }}>{name}</button>
               ))}
             </div>
@@ -190,14 +186,14 @@ export default function SettingsPage() {
 
         {/* ── Admin Password ── */}
         <div className="settings-card">
-          <h4>🔒 Admin Password</h4>
+          <h4>🔒 {isTa ? 'நிர்வாக கடவுச்சொல்' : 'Admin Password'}</h4>
           <p style={{ fontSize: 12, color: 'var(--ink3)', margin: '4px 0 14px' }}>
-            Required to access the Admin panel.
+            {isTa ? 'நிர்வாக பக்கத்தை அணுக கடவுச்சொல் தேவை.' : 'Required to access the Admin panel.'}
           </p>
           {[
-            ['Current Password',     curPwd, setCurPwd],
-            ['New Password',         newPwd, setNewPwd],
-            ['Confirm New Password', conPwd, setConPwd],
+            [isTa ? 'தற்போதைய கடவுச்சொல்' : 'Current Password',     curPwd, setCurPwd],
+            [isTa ? 'புதிய கடவுச்சொல்' : 'New Password',         newPwd, setNewPwd],
+            [isTa ? 'புதிய கடவுச்சொல்லை உறுதிசெய்' : 'Confirm New Password', conPwd, setConPwd],
           ].map(([l, v, s]) => (
             <div key={l} className="setting-field">
               <label>{l}</label>
@@ -205,7 +201,7 @@ export default function SettingsPage() {
             </div>
           ))}
           <button className="btn-primary" style={{ width: '100%', marginTop: 4 }} onClick={changePwd}>
-            Update Password
+            {isTa ? 'கடவுச்சொல்லை மாற்றுக' : 'Update Password'}
           </button>
         </div>
       </main>

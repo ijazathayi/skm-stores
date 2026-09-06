@@ -1,10 +1,11 @@
 'use client';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
-import { useRouter } from 'next/navigation';
+import { getProductName, t } from '@/lib/translations';
 
 export default function CartDrawer({ open, onClose, onComplete }) {
-  const { cart, removeFromCart, updateCartItem, clearCart, completeSale, isSubmittingSale, cartTotal } = useStore();
+  const { cart, removeFromCart, updateCartItem, clearCart, completeSale, isSubmittingSale, cartTotal, lang } = useStore();
+  const isTa = lang === 'ta';
 
   const handleComplete = async () => {
     try {
@@ -24,7 +25,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
         {/* head */}
         <div className="drawer-head">
           <div style={{ fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-            🛒 Current Bill
+            🛒 {isTa ? 'தற்போதைய ரசீது' : 'Current Bill'}
             {cart.length > 0 && (
               <span style={{ background: 'var(--primary)', color: '#fff', fontSize: 12, fontWeight: 700, borderRadius: 999, padding: '2px 8px' }}>
                 {cart.length}
@@ -33,9 +34,9 @@ export default function CartDrawer({ open, onClose, onComplete }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {cart.length > 0 && (
-              <button onClick={() => { if (confirm('Clear all items?')) clearCart(); }}
+              <button onClick={() => { if (confirm(isTa ? 'கூடையில் உள்ள அனைத்தையும் நீக்கவா?' : 'Clear all items?')) clearCart(); }}
                 style={{ background: 'transparent', border: 'none', fontSize: 13, color: 'var(--danger)', cursor: 'pointer', padding: '8px 4px' }}>
-                Clear all
+                {isTa ? 'அனைத்தும் நீக்கு' : 'Clear all'}
               </button>
             )}
             <button className="drawer-close" onClick={onClose}>✕</button>
@@ -47,7 +48,9 @@ export default function CartDrawer({ open, onClose, onComplete }) {
           {cart.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0' }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div>
-              <div style={{ color: 'var(--ink3)', fontSize: 15 }}>Cart is empty.<br />Search and tap a product to add.</div>
+              <div style={{ color: 'var(--ink3)', fontSize: 15 }}>
+                {isTa ? <>கூடை காலியாக உள்ளது.<br />பொருளைத் தேடி சேர்த்துக்கொள்ளவும்.</> : <>Cart is empty.<br />Search and tap a product to add.</>}
+              </div>
             </div>
           ) : cart.map((c, i) => {
             const isKg = c.unit === 'kg';
@@ -56,13 +59,16 @@ export default function CartDrawer({ open, onClose, onComplete }) {
               : (c.qty ? String(c.qty) : '');
             const qtyDisplay = isKg ? kgQty : (c.qty || '');
             const lineAmt = (Number(qtyDisplay) || 0) * (Number(c.price) || 0);
+            const displayName = getProductName(c, lang);
 
             return (
               <div key={i} className="cart-item">
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, flex: 1 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{c.name}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: '#E8F0E6', borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap' }}>{c.unit}</span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{displayName}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: '#E8F0E6', borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap' }}>
+                      {isTa ? (c.unit === 'kg' ? 'கிலோ' : (c.unit === 'pcs' ? 'எண்ணிக்கை' : c.unit)) : c.unit}
+                    </span>
                   </div>
                   <button className="cart-item-delete" onClick={() => removeFromCart(i)}>✕</button>
                 </div>
@@ -81,14 +87,14 @@ export default function CartDrawer({ open, onClose, onComplete }) {
                   {c.unit === 'both' && (
                     <select value={c.unit} onChange={(e) => updateCartItem(i, 'unit', e.target.value)}
                       style={{ border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', fontSize: 14, fontWeight: 600, padding: '0 8px', color: 'var(--ink)', width: 'auto', minWidth: 58, height: 44 }}>
-                      <option value="pcs">pcs</option>
-                      <option value="kg">kg</option>
+                      <option value="pcs">{isTa ? 'எண்ணிக்கை (pcs)' : 'pcs'}</option>
+                      <option value="kg">{isTa ? 'கிலோ (kg)' : 'kg'}</option>
                     </select>
                   )}
 
                   <div className="cart-price-wrap">
                     <span style={{ fontSize: 14, color: 'var(--ink3)', flexShrink: 0 }}>₹</span>
-                    <input type="text" inputMode="decimal" placeholder="price" value={c.price}
+                    <input type="text" inputMode="decimal" placeholder={isTa ? "விலை" : "price"} value={c.price}
                       onChange={(e) => updateCartItem(i, 'price', e.target.value)} />
                   </div>
                   <span style={{ fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 15, fontWeight: 700, color: 'var(--primary-dark)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
@@ -98,7 +104,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
 
                 {isKg && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap' }}>Customer ₹</span>
+                    <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap' }}>{isTa ? 'வாடிக்கையாளர் ₹' : 'Customer ₹'}</span>
                     <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', padding: '0 10px', height: 40, flex: 1, maxWidth: 140 }}>
                       <input type="text" inputMode="decimal" placeholder="e.g. 30" value={c.budget || ''}
                         onChange={(e) => updateCartItem(i, 'budget', e.target.value)}
@@ -106,7 +112,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
                     </div>
                     {Number(qtyDisplay) > 0 && (
                       <span style={{ fontSize: 12, color: 'var(--primary-dark)', fontWeight: 600, background: '#E8F0E6', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
-                        ≈ {(Number(qtyDisplay) * 1000).toFixed(0)} g
+                        ≈ {(Number(qtyDisplay) * 1000).toFixed(0)} {isTa ? 'கிராம்' : 'g'}
                       </span>
                     )}
                   </div>
@@ -119,7 +125,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
         {/* foot */}
         <div className="drawer-foot">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
-            <span style={{ fontSize: 16, fontWeight: 600 }}>Total</span>
+            <span style={{ fontSize: 16, fontWeight: 600 }}>{isTa ? 'மொத்த தொகை' : 'Total'}</span>
             <span style={{ fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 26, fontWeight: 700, color: 'var(--primary-dark)' }}>
               {money(cartTotal())}
             </span>
@@ -127,7 +133,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
           <button className="btn-primary" style={{ width: '100%' }}
             onClick={handleComplete}
             disabled={cart.length === 0 || isSubmittingSale}>
-            {isSubmittingSale ? 'Saving…' : 'Complete sale'}
+            {isSubmittingSale ? (isTa ? 'சேமிக்கப்படுகிறது…' : 'Saving…') : (isTa ? 'விற்பனையை முடிக்க' : 'Complete sale')}
           </button>
         </div>
       </div>

@@ -6,9 +6,20 @@ import {
   collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useStore } from '@/lib/store';
 
 /* ── constants ── */
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Not fixed'];
+const DAYS_TA = {
+  'Monday': 'திங்கள் (Monday)',
+  'Tuesday': 'செவ்வாய் (Tuesday)',
+  'Wednesday': 'புதன் (Wednesday)',
+  'Thursday': 'வியாழன் (Thursday)',
+  'Friday': 'வெள்ளி (Friday)',
+  'Saturday': 'சனி (Saturday)',
+  'Sunday': 'ஞாயிறு (Sunday)',
+  'Not fixed': 'குறிப்பிட்ட நாள் இல்லை',
+};
 
 /* ── utils ── */
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -61,6 +72,8 @@ function Modal({ open, onClose, children, maxWidth = 860 }) {
 
 /* ── main component ── */
 export default function AgencyOrderApp() {
+  const { lang } = useStore();
+  const isTa = lang === 'ta';
   const [agencies, setAgencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -153,29 +166,26 @@ export default function AgencyOrderApp() {
     setAgencyModal(true);
   }
 
-  async function saveAgency() {
+  async function saveAgency(e) {
+    e.preventDefault();
     const name = aName.trim();
-    if (!name) return showToast('Agency name is required');
-    const data = {
-      name,
-      phone: aPhone.trim(),
-      person: aPerson.trim(),
-      day: aDay
-    };
+    if (!name || isSavingAgency) return;
 
     try {
       setIsSavingAgency(true);
       if (editingId) {
-        await updateDoc(doc(db, 'agencies', editingId), data);
+        await updateDoc(doc(db, 'agencies', editingId), {
+          name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay
+        });
+        showToast(isTa ? '✓ ஏஜென்சி புதுப்பிக்கப்பட்டது' : '✓ Agency updated');
       } else {
         await addDoc(collection(db, 'agencies'), {
-          ...data,
-          created: Date.now(),
-          products: []
+          name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay,
+          products: [], created: Date.now()
         });
+        showToast(isTa ? '✓ ஏஜென்சி சேர்க்கப்பட்டது' : '✓ Agency added');
       }
       setAgencyModal(false);
-      showToast('Saved successfully');
     } catch (err) {
       alert('Error saving agency: ' + err.message);
     } finally {
@@ -186,43 +196,51 @@ export default function AgencyOrderApp() {
   async function deleteAgency(id) {
     const a = agency(id);
     if (!a) return;
-    const prodCount = (a.products && a.products.length) || 0;
-    if (!confirm(`Delete "${a.name}" and its ${prodCount} products?`)) return;
+    if (!confirm(isTa ? `"${a.name}" ஏஜென்சியை நீக்கவா?` : `Delete agency "${a.name}" and all its products?`)) return;
+
     try {
       await deleteDoc(doc(db, 'agencies', id));
-      showToast('Agency deleted');
+      showToast(isTa ? 'ஏஜென்சி நீக்கப்பட்டது' : 'Agency deleted');
     } catch (err) {
       alert('Error deleting agency: ' + err.message);
     }
   }
 
-  /* ── products CRUD ── */
-  function openProducts(id) {
-    setProductAgencyId(id);
-    setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
+  /* ── product CRUD ── */
+  function openProducts(agencyId) {
+    setProductAgencyId(agencyId);
+    setPName('');
+    setPUnit('');
+    setPWhole('');
+    setPRetail('');
     setProductModal(true);
   }
 
-  async function addProduct() {
+  async function addProduct(e) {
+    e.preventDefault();
     const name = pName.trim();
-    if (!name) return showToast('Product name is required');
+    if (!name || !productAgencyId || isSavingProduct) return;
+
     const a = agency(productAgencyId);
     if (!a) return;
 
-    const newProduct = {
+    const newProd = {
       id: uid(),
       name,
-      unit: pUnit.trim(),
+      unit: pUnit.trim() || 'pcs',
       wholesale: +pWhole || 0,
       retail: +pRetail || 0
     };
 
     try {
       setIsSavingProduct(true);
-      const updatedProducts = [...(a.products || []), newProduct];
+      const updatedProducts = [...(a.products || []), newProd];
       await updateDoc(doc(db, 'agencies', productAgencyId), { products: updatedProducts });
-      setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
-      showToast('Product added');
+      setPName('');
+      setPUnit('');
+      setPWhole('');
+      setPRetail('');
+      showToast(isTa ? '✓ பொருள் சேர்க்கப்பட்டது' : '✓ Product added');
     } catch (err) {
       alert('Error adding product: ' + err.message);
     } finally {
@@ -230,21 +248,21 @@ export default function AgencyOrderApp() {
     }
   }
 
-  async function removeProduct(agencyId, productId) {
+  async function deleteProduct(agencyId, prodId) {
     const a = agency(agencyId);
     if (!a) return;
     try {
-      const updatedProducts = (a.products || []).filter((p) => p.id !== productId);
+      const updatedProducts = (a.products || []).filter((p) => p.id !== prodId);
       await updateDoc(doc(db, 'agencies', agencyId), { products: updatedProducts });
-      showToast('Product removed');
+      showToast(isTa ? 'பொருள் நீக்கப்பட்டது' : 'Product removed');
     } catch (err) {
-      alert('Error removing product: ' + err.message);
+      alert('Error deleting product: ' + err.message);
     }
   }
 
-  /* ── order ── */
-  function openOrder(id) {
-    setOrderAgencyId(id);
+  /* ── order cart ── */
+  function openOrder(agencyId) {
+    setOrderAgencyId(agencyId);
     setPriceMode('wholesale');
     setCart({});
     setOrderModal(true);

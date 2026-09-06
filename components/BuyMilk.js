@@ -164,7 +164,8 @@ function groupBySection(prices) {
 }
 
 export default function BuyMilk() {
-  const { milkPrices } = useStore();
+  const { milkPrices, lang } = useStore();
+  const isTa = lang === 'ta';
 
   // Local qty state: { [key]: number }
   const [qtys, setQtys] = useState(() =>
@@ -223,73 +224,31 @@ export default function BuyMilk() {
 
     const originalWrapper = document.getElementById('bm-bill-wrapper');
     const originalTable   = document.getElementById('bm-myTable');
-    const wrapperClone    = originalWrapper.cloneNode(true);
-    const tableClone      = wrapperClone.querySelector('#bm-myTable');
+    const billWrapper = document.getElementById('bm-bill-wrapper');
+    if (!billWrapper) throw new Error('Bill wrapper not found');
 
-    wrapperClone.style.position   = 'absolute';
-    wrapperClone.style.top        = '-9999px';
-    wrapperClone.style.width      = '370px';
-    wrapperClone.style.background = '#ffffff';
-    wrapperClone.style.padding    = '0';
+    const wrapperClone = billWrapper.cloneNode(true);
+    wrapperClone.id    = 'bm-bill-wrapper-clone';
+    wrapperClone.style.position = 'absolute';
+    wrapperClone.style.left     = '-9999px';
+    wrapperClone.style.top      = '-9999px';
     document.body.appendChild(wrapperClone);
 
-    // Replace inputs with plain text spans
-    const origInputs  = originalTable.querySelectorAll('input');
-    const cloneInputs = tableClone.querySelectorAll('input');
+    const tableClone  = wrapperClone.querySelector('#bm-myTable');
+    const origInputs  = billWrapper.querySelectorAll('.bm-peices-inps');
+    const cloneInputs = wrapperClone.querySelectorAll('.bm-peices-inps');
+
     origInputs.forEach((input, i) => {
       const span           = document.createElement('span');
       span.textContent     = input.value;
       span.style.display   = 'block';
       span.style.textAlign = 'center';
-      span.style.fontSize  = 'inherit';
       cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
     });
 
-    tableClone.style.width        = '100%';
-    tableClone.style.marginBottom = '0';
-
-    // Hide zero-qty item rows; collect section headers
-    const rows = Array.from(tableClone.querySelectorAll('tr'));
-    let lastSection = null;
-    const sections  = [];
-
-    rows.forEach((row) => {
-      const span      = row.querySelector('td > span');
-      const isItem    = !!span;
-      const thEl      = row.querySelector('th[colspan]');
-      const isHdr     = !isItem && thEl &&
-        parseInt(thEl.getAttribute('colspan')) > 1 &&
-        rows.indexOf(row) > 1 &&
-        !row.querySelector('td');
-
-      if (isHdr) {
-        lastSection = { headerRow: row, itemRows: [] };
-        sections.push(lastSection);
-      } else if (isItem && lastSection) {
-        lastSection.itemRows.push(row);
-      }
-    });
-
-    rows.forEach((row) => {
-      const span = row.querySelector('td > span');
-      if (span && (parseFloat(span.textContent) || 0) === 0) {
-        row.style.display = 'none';
-      }
-    });
-
-    sections.forEach(({ headerRow, itemRows }) => {
-      if (!itemRows.some((r) => r.style.display !== 'none')) {
-        headerRow.style.display = 'none';
-      }
-    });
-
-    // Strip wholesale price column
-    tableClone.querySelectorAll('tr').forEach((row) => {
-      if (row.style.display === 'none') return;
-      if (row.cells.length > 1) row.deleteCell(1);
-    });
-
-    const canvas = await html2canvas(wrapperClone, { backgroundColor: '#ffffff', scale: 2 });
+    const h2c = typeof window !== 'undefined' ? window.html2canvas : null;
+    if (!h2c) throw new Error('html2canvas not loaded');
+    const canvas = await h2c(wrapperClone, { backgroundColor: '#ffffff', scale: 2 });
     document.body.removeChild(wrapperClone);
     return canvas;
   }, []);
@@ -308,9 +267,9 @@ export default function BuyMilk() {
       canvas.toBlob(async (blob) => {
         const file = new File([blob], 'Milk_Bill.png', { type: 'image/png' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: 'Milk Bill' });
+          await navigator.share({ files: [file], title: isTa ? 'பால் கணக்கு ரசீது' : 'Milk Bill' });
         } else {
-          alert('Sharing not supported on this browser. Downloading instead…');
+          alert(isTa ? 'பகிரும் வசதி இல்லை. பதிவிறக்கப்படுகிறது…' : 'Sharing not supported on this browser. Downloading instead…');
           downloadTableImage();
         }
       }, 'image/png');
@@ -318,9 +277,37 @@ export default function BuyMilk() {
       console.error('Sharing failed:', err);
       downloadTableImage();
     }
-  }, [generateCanvas, downloadTableImage]);
+  }, [generateCanvas, downloadTableImage, isTa]);
 
   const sections = groupBySection(milkPrices);
+
+  const getSectionTitle = (sec) => {
+    if (!isTa) return sec;
+    const map = {
+      'Milk': '🥛 பால் வகைகள்',
+      'Curd': 'தயிர் வகைகள்',
+      'Cup Curd': 'கப் தயிர் வகைகள்',
+      'Butter Milk & Lassi': 'மோர் & லஸ்ஸி',
+    };
+    return map[sec] || sec;
+  };
+
+  const getItemLabel = (item) => {
+    if (!isTa) return item.label;
+    const map = {
+      '1 Litre': '1 லிட்டர்',
+      '0.5 Litre': 'அரை லிட்டர் (0.5L)',
+      '250ml': '250 மிலி',
+      '180ml': '180 மிலி',
+      '115ml': '115 மிலி',
+      '110ml': '110 மிலி',
+      '85ml': '85 மிலி கப்',
+      '200ml': '200 மிலி கப்',
+      '180ml B.milk': '180 மிலி மோர்',
+      'Lassi': 'லஸ்ஸி',
+    };
+    return map[item.label] || item.label;
+  };
 
   return (
     <>
@@ -331,14 +318,14 @@ export default function BuyMilk() {
       />
 
       <div className="bm-root">
-        <Link href="/" className="bm-back">← Back</Link>
+        <Link href="/" className="bm-back">← {isTa ? 'முகப்பு' : 'Back'}</Link>
 
         {/* ── Bill wrapper (captured as image) ── */}
         <div id="bm-bill-wrapper">
 
           <div id="bm-shop-header">
-            <div id="bm-shop-name">S.K.M STORES</div>
-            <div id="bm-shop-tagline">🥛 Fresh Dairy &amp; Products</div>
+            <div id="bm-shop-name">{isTa ? 'எஸ்.கே.எம் ஸ்டோர்ஸ்' : 'S.K.M STORES'}</div>
+            <div id="bm-shop-tagline">{isTa ? '🥛 பசுமையான பால் & பால் பொருட்கள்' : '🥛 Fresh Dairy & Products'}</div>
             <div id="bm-shop-divider"></div>
             <div id="bm-bill-date"></div>
           </div>
@@ -346,29 +333,21 @@ export default function BuyMilk() {
           <div className="bm-table-scroll">
             <table id="bm-myTable">
               <tbody>
-                {/* hidden date row for legacy compat */}
-                <tr style={{ display: 'none' }}><th colSpan="4"></th></tr>
-
                 {/* column headers */}
                 <tr>
-                  <th colSpan="5" style={{ display: 'none' }}></th>
-                </tr>
-                <tr>
-                  <th>Packets</th>
-                  <th>Wholesale Price</th>
-                  <th>Price</th>
-                  <th>No. of Pieces</th>
-                  <th>Total Price</th>
+                  <th>{isTa ? 'பாக்கெட்டுகள்' : 'Packets'}</th>
+                  <th>{isTa ? 'மொத்த விலை (WP)' : 'Wholesale Price'}</th>
+                  <th>{isTa ? 'விற்பனை விலை (SP)' : 'Price'}</th>
+                  <th>{isTa ? 'எண்ணிக்கை' : 'No. of Pieces'}</th>
+                  <th>{isTa ? 'மொத்த தொகை' : 'Total Price'}</th>
                 </tr>
 
                 {Object.entries(sections).map(([section, items]) => (
-                  <>
-                    <tr key={`hdr-${section}`}>
-                      <th colSpan="5">{section}</th>
-                    </tr>
+                  <tr key={`wrap-${section}`} style={{ display: 'contents' }}>
+                    <th colSpan="5" style={{ background: '#0056b3', color: '#fff' }}>{getSectionTitle(section)}</th>
                     {items.map((item) => (
                       <tr key={item.key}>
-                        <td>{item.label}</td>
+                        <td>{getItemLabel(item)}</td>
                         <td>₹{Number(item.wp).toFixed(2)}</td>
                         <td>₹{Number(item.sp).toFixed(2)}</td>
                         <td>
@@ -384,12 +363,12 @@ export default function BuyMilk() {
                         <td>₹{(totals[item.key] || 0).toFixed(2)}</td>
                       </tr>
                     ))}
-                  </>
+                  </tr>
                 ))}
 
                 {/* Grand total */}
                 <tr style={{ background: '#f0f0f0', fontWeight: 'bold' }}>
-                  <td colSpan="3">Grand Total</td>
+                  <td colSpan="3">{isTa ? 'மொத்த தொகை (Grand Total)' : 'Grand Total'}</td>
                   <td>{grandPieces}</td>
                   <td>₹{grandTotal.toFixed(2)}</td>
                 </tr>
@@ -399,8 +378,12 @@ export default function BuyMilk() {
         </div>
 
         <section id="bm-buttons">
-          <button className="bm-download-btn" onClick={downloadTableImage}>Download</button>
-          <button className="bm-download-btn" onClick={shareTableImage}>Share Via..</button>
+          <button className="bm-download-btn" onClick={downloadTableImage}>
+            {isTa ? '📥 பதிவிறக்கம்' : 'Download'}
+          </button>
+          <button className="bm-download-btn" onClick={shareTableImage}>
+            {isTa ? '📤 பகிரவும் (Share)' : 'Share Via..'}
+          </button>
         </section>
       </div>
     </>

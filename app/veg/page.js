@@ -3,9 +3,11 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { matchesSearch } from '@/lib/helpers';
+import { getProductName } from '@/lib/translations';
 
 export default function VegPage() {
-  const { vegPrices, addVegPrice, updateVegPrice, deleteVegPrice } = useStore();
+  const { vegPrices, addVegPrice, updateVegPrice, deleteVegPrice, lang } = useStore();
+  const isTa = lang === 'ta';
   const [search, setSearch] = useState('');
   const [form, setForm] = useState({ name: '', altName: '', price: '', unit: 'kg' });
   const [editItem, setEditItem] = useState(null);
@@ -34,56 +36,70 @@ export default function VegPage() {
 
   return (
     <>
-      <Header backHref="/" title="🥕 Veg Prices" />
+      <Header backHref="/" title={isTa ? '🥕 காய்கறி விலை' : '🥕 Veg Prices'} />
       <main className="wrap">
         <p style={{ fontSize: 12, color: 'var(--ink3)', marginBottom: 14 }}>
-          Add products and prices here. Edit a price anytime — it updates automatically.
+          {isTa ? 'காய்கறி மற்றும் தினசரி விலைப்பட்டியல். மாற்றியமைத்தால் உடனடியாக புதுப்பிக்கப்படும்.' : 'Add products and prices here. Edit a price anytime — it updates automatically.'}
         </p>
 
         {/* search */}
         <div className="search-wrap">
           <div className="search-row" style={{ minHeight: 48 }}>
             <span style={{ fontSize: 17 }}>🔍</span>
-            <input placeholder="Search veg prices…" value={search} onChange={(e) => setSearch(e.target.value)} autoComplete="off" />
+            <input
+              placeholder={isTa ? 'காய்கறி விலையைத் தேடுங்கள்…' : 'Search veg prices…'}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              autoComplete="off"
+            />
             {search && <button onClick={() => setSearch('')} style={{ background: 'transparent', border: 'none', color: 'var(--ink3)', fontSize: 18, cursor: 'pointer', padding: '0 4px' }}>✕</button>}
           </div>
         </div>
 
         {/* add form */}
         <div className="veg-add-row">
-          <input placeholder="Name (e.g. Tomato)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" />
-          <input placeholder="தமிழ் பெயர் (optional)" value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
-          <input type="text" inputMode="decimal" placeholder="Price ₹" value={form.price}
+          <input placeholder={isTa ? 'பெயர் (எ.கா. தக்காளி)' : 'Name (e.g. Tomato)'} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" />
+          <input placeholder={isTa ? 'தமிழ் பெயர்' : 'தமிழ் பெயர் (optional)'} value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
+          <input type="text" inputMode="decimal" placeholder={isTa ? 'விலை ₹' : 'Price ₹'} value={form.price}
             onChange={(e) => setForm({ ...form, price: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }} />
           <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
-            <option value="kg">kg</option><option value="pcs">pcs</option><option value="both">both</option>
+            <option value="kg">{isTa ? 'கிலோ' : 'kg'}</option>
+            <option value="pcs">{isTa ? 'எண்ணிக்கை' : 'pcs'}</option>
+            <option value="both">{isTa ? 'இரண்டும்' : 'both'}</option>
           </select>
         </div>
         <div className="add-row">
-          <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>+ Add Price</button>
+          <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>
+            {isTa ? '+ விலை சேர்க்க' : '+ Add Price'}
+          </button>
         </div>
 
-        <div style={{ fontSize: 12, color: 'var(--ink3)', marginBottom: 8 }}>{filtered.length} item{filtered.length !== 1 ? 's' : ''}</div>
+        <div style={{ fontSize: 12, color: 'var(--ink3)', marginBottom: 8 }}>
+          {filtered.length} {isTa ? 'வகைகள்' : `item${filtered.length !== 1 ? 's' : ''}`}
+        </div>
 
-        {filtered.length === 0 ? <div className="empty-box">{search ? 'No matching items.' : 'No veg prices added yet.'}</div> : (
+        {filtered.length === 0 ? <div className="empty-box">{search ? (isTa ? 'பொருட்கள் எதுவும் கிடைக்கவில்லை.' : 'No matching items.') : (isTa ? 'விலைகள் எதுவும் சேர்க்கப்படவில்லை.' : 'No veg prices added yet.')}</div> : (
           <div className="veg-list">
-            {filtered.map((v) => (
-              <div key={v.id} className="veg-row">
-                <div style={{ flex: 1 }}>
-                  <div className="veg-row-name">
-                    {v.name}
-                    {v.altName && v.altName !== v.name && <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 400, marginLeft: 6 }}>({v.altName})</span>}
+            {filtered.map((v) => {
+              const displayName = getProductName(v, lang);
+              return (
+                <div key={v.id} className="veg-row">
+                  <div style={{ flex: 1 }}>
+                    <div className="veg-row-name">
+                      {displayName}
+                      {displayName !== v.name && <span style={{ fontSize: 11, color: 'var(--ink3)', fontWeight: 400, marginLeft: 6 }}>({v.name})</span>}
+                    </div>
+                    <span style={{ fontSize: 11, color: 'var(--ink3)' }}>{isTa ? (v.unit === 'kg' ? 'கிலோ' : (v.unit === 'pcs' ? 'எண்ணிக்கை' : v.unit)) : (v.unit || 'kg')}</span>
                   </div>
-                  <span style={{ fontSize: 11, color: 'var(--ink3)' }}>{v.unit || 'kg'}</span>
+                  <span className="veg-row-price">₹{Number(v.price).toFixed(2)}</span>
+                  <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
+                    <button className="icon-btn" onClick={() => openEdit(v)}>✎</button>
+                    <button className="icon-btn" onClick={() => { if (confirm(isTa ? 'இந்த விலையை நீக்கவா?' : 'Remove this veg price?')) deleteVegPrice(v.id); }}>🗑</button>
+                  </div>
                 </div>
-                <span className="veg-row-price">₹{Number(v.price).toFixed(2)}</span>
-                <div style={{ display: 'flex', gap: 4, marginLeft: 8 }}>
-                  <button className="icon-btn" onClick={() => openEdit(v)}>✎</button>
-                  <button className="icon-btn" onClick={() => { if (confirm('Remove this veg price?')) deleteVegPrice(v.id); }}>🗑</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>
@@ -93,27 +109,35 @@ export default function VegPage() {
         <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) setEditItem(null); }}>
           <div className="modal-box">
             <div className="modal-head">
-              <h3 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: 16, fontWeight: 700 }}>✎ Edit Price</h3>
+              <h3 style={{ margin: 0, fontFamily: 'Georgia,serif', fontSize: 16, fontWeight: 700 }}>
+                {isTa ? '✎ விலையைத் திருத்துக' : '✎ Edit Price'}
+              </h3>
               <button className="drawer-close" onClick={() => setEditItem(null)}>✕</button>
             </div>
             <div className="modal-body">
-              {[['name','Product Name'],['altName','Tamil Name'],['price','Price ₹']].map(([k,l]) => (
+              {[
+                ['name', isTa ? 'பொருளின் பெயர் (English)' : 'Product Name'],
+                ['altName', isTa ? 'தமிழ் பெயர்' : 'Tamil Name'],
+                ['price', isTa ? 'விலை ₹' : 'Price ₹']
+              ].map(([k, l]) => (
                 <div key={k} className="modal-field">
                   <label>{l}</label>
-                  <input type="text" inputMode={k==='price'?'decimal':'text'} value={editForm[k] || ''}
+                  <input type="text" inputMode={k === 'price' ? 'decimal' : 'text'} value={editForm[k] || ''}
                     onChange={(e) => setEditForm({ ...editForm, [k]: e.target.value })} />
                 </div>
               ))}
               <div className="modal-field">
-                <label>Unit</label>
+                <label>{isTa ? 'அளவு முறை' : 'Unit'}</label>
                 <select value={editForm.unit} onChange={(e) => setEditForm({ ...editForm, unit: e.target.value })}>
-                  <option value="kg">kg</option><option value="pcs">pcs</option><option value="both">both</option>
+                  <option value="kg">{isTa ? 'கிலோ' : 'kg'}</option>
+                  <option value="pcs">{isTa ? 'எண்ணிக்கை' : 'pcs'}</option>
+                  <option value="both">{isTa ? 'இரண்டும்' : 'both'}</option>
                 </select>
               </div>
             </div>
             <div className="modal-foot">
-              <button className="btn-cancel" onClick={() => setEditItem(null)}>Cancel</button>
-              <button className="btn-save" onClick={handleSave}>Save</button>
+              <button className="btn-cancel" onClick={() => setEditItem(null)}>{isTa ? 'ரத்து' : 'Cancel'}</button>
+              <button className="btn-save" onClick={handleSave}>{isTa ? 'சேமி' : 'Save'}</button>
             </div>
           </div>
         </div>

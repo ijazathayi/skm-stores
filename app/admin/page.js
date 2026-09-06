@@ -1,31 +1,186 @@
 'use client';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
-import { deleteDoc, doc, collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+
+const ADMIN_PASSWORD = 'skm@ijaz';
+
+/* ── Password lock screen ── */
+function PasswordGate({ onUnlock }) {
+  const [input, setInput]   = useState('');
+  const [error, setError]   = useState('');
+  const [show,  setShow]    = useState(false);
+
+  const attempt = (e) => {
+    e.preventDefault();
+    if (input === ADMIN_PASSWORD) {
+      sessionStorage.setItem('skm-admin-auth', '1');
+      onUnlock();
+    } else {
+      setError('Incorrect password. Try again.');
+      setInput('');
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      background: 'var(--paper)', padding: 24,
+    }}>
+      <div style={{
+        background: 'var(--card)', borderRadius: 16,
+        boxShadow: '0 4px 32px rgba(0,0,0,.12)',
+        padding: '36px 32px', width: 'min(360px, 100%)', textAlign: 'center',
+      }}>
+        <div style={{ fontSize: 44, marginBottom: 12 }}>🛡️</div>
+        <h2 style={{ margin: '0 0 4px', fontFamily: 'Georgia, serif', fontSize: 20 }}>Admin Access</h2>
+        <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--ink3)' }}>Enter the admin password to continue.</p>
+
+        <form onSubmit={attempt} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={show ? 'text' : 'password'}
+              value={input}
+              onChange={(e) => { setInput(e.target.value); setError(''); }}
+              placeholder="Password"
+              autoFocus
+              style={{
+                width: '100%', padding: '12px 44px 12px 14px',
+                borderRadius: 10, border: '1.5px solid var(--border)',
+                fontSize: 15, background: 'var(--paper)', color: 'var(--ink)',
+                boxSizing: 'border-box',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShow((s) => !s)}
+              style={{
+                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                fontSize: 18, color: 'var(--ink3)', padding: 4,
+              }}
+              aria-label={show ? 'Hide password' : 'Show password'}
+            >
+              {show ? '🙈' : '👁️'}
+            </button>
+          </div>
+
+          {error && (
+            <div style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600 }}>{error}</div>
+          )}
+
+          <button
+            type="submit"
+            className="btn-primary"
+            style={{ width: '100%', justifyContent: 'center', fontSize: 15 }}>
+            Unlock
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPage() {
-  const { inventory, bills, todaySales, deleteSale, deleteInventoryItem } = useStore();
+  const {
+    inventory, bills, todaySales,
+    deleteSale, deleteInventoryItem,
+    milkPrices, updateMilkPrices,
+  } = useStore();
+
+  // ── auth gate ── (all hooks must come before any early return)
+  const [authed, setAuthed] = useState(false);
+  useEffect(() => {
+    if (sessionStorage.getItem('skm-admin-auth') === '1') setAuthed(true);
+  }, []);
+
+  // ── milk price edit state ──
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft]       = useState([]);
+  const [saving, setSaving]     = useState(false);
+  const [saveMsg, setSaveMsg]   = useState('');
+
+  // ── gate render — AFTER all hooks ──
+  if (!authed) return <PasswordGate onUnlock={() => setAuthed(true)} />;
+
   const totalRevenue = bills.reduce((s, b) => s + (b.total || 0), 0);
 
+  const enterEdit = () => {
+    // deep-clone so we don't mutate store data
+    setDraft(milkPrices.map((p) => ({ ...p })));
+    setEditMode(true);
+    setSaveMsg('');
+  };
+
+  const cancelEdit = () => {
+    setEditMode(false);
+    setDraft([]);
+    setSaveMsg('');
+  };
+
+  const handleDraftChange = (key, field, value) => {
+    setDraft((prev) =>
+      prev.map((p) => p.key === key ? { ...p, [field]: value } : p)
+    );
+  };
+
+  const saveEdit = async () => {
+    // basic validation — reject blank / negative prices
+    for (const p of draft) {
+      if (p.wp === '' || p.sp === '' || Number(p.wp) < 0 || Number(p.sp) < 0) {
+        setSaveMsg('⚠️ All prices must be 0 or above.');
+        return;
+      }
+    }
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      // normalise numbers before saving
+      const normalised = draft.map((p) => ({
+        ...p,
+        wp: parseFloat(Number(p.wp).toFixed(2)),
+        sp: parseFloat(Number(p.sp).toFixed(2)),
+      }));
+      await updateMilkPrices(normalised);
+      setEditMode(false);
+      setDraft([]);
+      setSaveMsg('✅ Prices saved!');
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (err) {
+      setSaveMsg('❌ Save failed: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── inventory delete all ──
   const deleteAllInventory = async () => {
     if (!confirm(`Delete ALL ${inventory.length} products? Cannot be undone.`)) return;
     if (!confirm('Final confirm — delete every product?')) return;
     for (const p of inventory) await deleteInventoryItem(p.id);
   };
 
+  // group milk prices by section for display
+  const sections = milkPrices.reduce((acc, item) => {
+    if (!acc[item.section]) acc[item.section] = [];
+    acc[item.section].push(item);
+    return acc;
+  }, {});
+
   return (
     <>
       <Header backHref="/" title="🛡 Admin" />
       <main className="wrap">
-        {/* stats */}
+
+        {/* ── Stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 20 }}>
           {[
             ['Inventory Items', inventory.length],
-            ['Total Sales', bills.length],
-            ["Today's Sales", money(todaySales())],
-            ['Revenue', money(totalRevenue)]
+            ['Total Sales',     bills.length],
+            ["Today's Sales",   money(todaySales())],
+            ['Revenue',         money(totalRevenue)],
           ].map(([l, v]) => (
             <div key={l} className="bill-card">
               <div style={{ fontSize: 12, color: 'var(--ink3)' }}>{l}</div>
@@ -34,23 +189,152 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* overview */}
+        {/* ── 🥛 Buy Milk Prices ── */}
+        <div className="settings-card" style={{ marginBottom: 24 }}>
+
+          {/* header row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+            <div>
+              <h4 style={{ margin: 0 }}>🥛 Buy Milk Prices</h4>
+              <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 3 }}>
+                Wholesale Price = used for bill calculations &nbsp;·&nbsp; Price = retail display
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {saveMsg && (
+                <span style={{ fontSize: 13, fontWeight: 600, color: saveMsg.startsWith('✅') ? 'var(--primary-dark)' : '#a93b2c' }}>
+                  {saveMsg}
+                </span>
+              )}
+              {!editMode ? (
+                <button
+                  onClick={enterEdit}
+                  style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  ✏️ Edit Prices
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={cancelEdit}
+                    style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: 'var(--ink3)', cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveEdit}
+                    disabled={saving}
+                    style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}>
+                    {saving ? 'Saving…' : '💾 Save'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* price table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: 'var(--paper)' }}>
+                  <th style={thStyle}>Section</th>
+                  <th style={thStyle}>Packet</th>
+                  <th style={thStyle}>Wholesale Price (₹)</th>
+                  <th style={thStyle}>Retail Price (₹)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(editMode ? draft : milkPrices).map((item, idx) => {
+                  const isNewSection =
+                    idx === 0 ||
+                    (editMode ? draft : milkPrices)[idx - 1].section !== item.section;
+                  const sectionItems = (editMode ? draft : milkPrices).filter(
+                    (p) => p.section === item.section
+                  );
+                  const sectionStart = (editMode ? draft : milkPrices).findIndex(
+                    (p) => p.section === item.section
+                  );
+
+                  return (
+                    <tr key={item.key} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? '#fff' : 'var(--paper)' }}>
+                      {/* section cell — rowspan per section */}
+                      {isNewSection && (
+                        <td
+                          rowSpan={sectionItems.length}
+                          style={{ ...tdStyle, fontWeight: 700, color: 'var(--primary-dark)', background: '#E8F0E6', verticalAlign: 'middle', textAlign: 'center' }}>
+                          {item.section}
+                        </td>
+                      )}
+                      <td style={tdStyle}>{item.label}</td>
+
+                      {/* Wholesale Price */}
+                      <td style={tdStyle}>
+                        {editMode ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={item.wp}
+                            onChange={(e) => handleDraftChange(item.key, 'wp', e.target.value)}
+                            style={priceInputStyle}
+                          />
+                        ) : (
+                          <span style={{ fontWeight: 600, color: 'var(--primary-dark)' }}>₹{Number(item.wp).toFixed(2)}</span>
+                        )}
+                      </td>
+
+                      {/* Retail Price */}
+                      <td style={tdStyle}>
+                        {editMode ? (
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.25"
+                            value={item.sp}
+                            onChange={(e) => handleDraftChange(item.key, 'sp', e.target.value)}
+                            style={priceInputStyle}
+                          />
+                        ) : (
+                          <span style={{ fontWeight: 600 }}>₹{Number(item.sp).toFixed(2)}</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {editMode && (
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ink3)' }}>
+              💡 Tip: changes save to Firestore and take effect on the Buy Milk page immediately.
+            </div>
+          )}
+        </div>
+
+        {/* ── Inventory + Sales ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: 18 }}>
+
+          {/* Inventory */}
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>Inventory</span>
-              <button onClick={deleteAllInventory}
+              <button
+                onClick={deleteAllInventory}
                 style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 7, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                 🗑 Delete All
               </button>
             </div>
             <div className="inv-list" style={{ maxHeight: 400, overflowY: 'auto' }}>
-              {inventory.length === 0 ? <div className="empty-box">No products.</div> :
-                inventory.map((p) => (
+              {inventory.length === 0
+                ? <div className="empty-box">No products.</div>
+                : inventory.map((p) => (
                   <div key={p.id} className="inv-row">
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: 500 }}>{p.name}</span>
-                      {p.price && <span style={{ background: 'var(--primary)', color: '#fff', padding: '1px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, marginLeft: 6 }}>₹{Number(p.price).toFixed(2)}</span>}
+                      {p.price && (
+                        <span style={{ background: 'var(--primary)', color: '#fff', padding: '1px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600, marginLeft: 6 }}>
+                          ₹{Number(p.price).toFixed(2)}
+                        </span>
+                      )}
                     </div>
                     <button className="icon-btn" onClick={() => { if (confirm('Delete?')) deleteInventoryItem(p.id); }}>🗑</button>
                   </div>
@@ -58,11 +342,14 @@ export default function AdminPage() {
               }
             </div>
           </div>
+
+          {/* Sales */}
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Sales</div>
             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-              {bills.length === 0 ? <div className="empty-box">No sales.</div> :
-                bills.map((b) => (
+              {bills.length === 0
+                ? <div className="empty-box">No sales.</div>
+                : bills.map((b) => (
                   <div key={b.id} className="bill-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
                       <div style={{ fontWeight: 600, fontSize: 13 }}>{new Date(b.timestamp).toLocaleString()}</div>
@@ -71,14 +358,45 @@ export default function AdminPage() {
                         <button className="icon-btn" onClick={() => { if (confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>
                       </span>
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>{(b.items||[]).length} items</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>{(b.items || []).length} items</div>
                   </div>
                 ))
               }
             </div>
           </div>
         </div>
+
       </main>
     </>
   );
 }
+
+/* ── inline style helpers ── */
+const thStyle = {
+  padding: '8px 12px',
+  textAlign: 'left',
+  fontWeight: 700,
+  fontSize: 12,
+  color: 'var(--ink3)',
+  borderBottom: '1px solid var(--border)',
+  whiteSpace: 'nowrap',
+};
+
+const tdStyle = {
+  padding: '9px 12px',
+  borderBottom: '1px solid var(--border)',
+  whiteSpace: 'nowrap',
+};
+
+const priceInputStyle = {
+  width: 90,
+  padding: '6px 8px',
+  border: '1.5px solid var(--primary)',
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 600,
+  color: 'var(--ink)',
+  background: '#fff',
+  outline: 'none',
+  textAlign: 'right',
+};

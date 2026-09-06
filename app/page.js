@@ -9,6 +9,7 @@ const NAV = [
   { href: '/inventory', icon: '📦', name: 'Inventory',    subFn: (s) => `${s.inventory.length} products` },
   { href: '/veg',       icon: '🥕', name: 'Veg Prices',   subFn: (s) => `${s.vegPrices.length} items` },
   { href: '/history',   icon: '📊', name: 'Sales',        subFn: (s) => `${s.bills.length} records` },
+  { href: '/buy-milk',  icon: '🥛', name: 'Buy Milk',     subFn: () => 'Daily dairy order' },
   { href: '/admin',     icon: '🛡️', name: 'Admin',        subFn: () => 'Overview & tools' },
   { href: '/settings',  icon: '⚙️', name: 'Settings',     subFn: () => 'Store & printer' },
 ];

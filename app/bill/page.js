@@ -3,10 +3,11 @@ import { useState, useCallback } from 'react';
 import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
+import { printReceipt } from '@/lib/printReceipt';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 
 export default function BillPage() {
-  const { inventory, vegPrices, cart, addToCart, bills } = useStore();
+  const { inventory, vegPrices, cart, addToCart, bills, storeProfile } = useStore();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -51,42 +52,9 @@ export default function BillPage() {
   const handleComplete = (bill) => {
     setLastBill(bill);
     setDrawerOpen(false);
-    if (typeof window !== 'undefined') printReceipt(bill);
-  };
-
-  const printReceipt = (bill) => {
-    const area = document.getElementById('printArea');
-    if (!area) return;
-    area.innerHTML = `
-      <div class="pr-center"><img src="/skm-logo.png" class="pr-logo" alt="SKM" /></div>
-      <div class="pr-center pr-title" style="margin-bottom:2px;">SKM STORES</div>
-      <div class="pr-center" style="font-size:10px;font-weight:700;margin-bottom:4px;">RETAIL INVOICE</div>
-      <div class="pr-meta" style="margin-bottom:2px;">
-        <div><span style="font-weight:700;">BILL NO - ${bill.billNo}</span></div>
-        <div><span style="font-weight:700;">DATE - ${new Date(bill.timestamp).toLocaleDateString('en-GB')}</span></div>
-        <div><span style="font-weight:700;">TIME - ${new Date(bill.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span></div>
-      </div>
-      <div class="pr-line"></div>
-      <div class="pr-row pr-table-head" style="grid-template-columns:5% 40% 6% 21% 22%;column-gap:2px;">
-        <span>#</span><span>ITEM</span><span style="text-align:center">Q</span>
-        <span style="text-align:right">RATE</span><span style="text-align:right">TOTAL</span>
-      </div>
-      <div class="pr-line"></div>
-      ${bill.items.map((it, idx) => `
-        <div class="pr-row pr-item" style="grid-template-columns:5% 40% 6% 21% 22%;column-gap:2px;margin-top:2px;">
-          <span>${idx+1}</span><span>${it.name}</span>
-          <span style="text-align:center">${it.qty}</span>
-          <span style="text-align:right">₹${Number(it.price).toFixed(2)}</span>
-          <span style="text-align:right">₹${(it.qty*it.price).toFixed(2)}</span>
-        </div>`).join('')}
-      <div class="pr-line"></div>
-      <div class="pr-row pr-total" style="grid-template-columns:1fr auto;margin-top:2px;">
-        <span>GRAND TOTAL</span><span>₹${bill.total.toFixed(2)}</span>
-      </div>
-      <div class="pr-line"></div>
-      <div class="pr-center pr-thanks" style="margin-top:6px;">THANK YOU VISIT AGAIN</div>
-    `;
-    setTimeout(() => window.print(), 80);
+    if (typeof window !== 'undefined') {
+      printReceipt(bill, storeProfile);
+    }
   };
 
   const cat = STORE_CATEGORIES.find((c) => c.id === selectedCategory);
@@ -201,9 +169,6 @@ export default function BillPage() {
 
       {/* Cart Drawer */}
       <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onComplete={handleComplete} />
-
-      {/* Print area */}
-      <div id="printArea" />
     </>
   );
 }

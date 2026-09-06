@@ -2,6 +2,7 @@
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
+import { printReceipt } from '@/lib/printReceipt';
 
 /* Group bills array into { "Sunday, 6 Sep 2026": [bill, …], … } */
 function groupByDate(bills) {
@@ -17,25 +18,12 @@ function groupByDate(bills) {
 }
 
 export default function HistoryPage() {
-  const { bills, todaySales } = useStore();
+  const { bills, todaySales, storeProfile } = useStore();
 
   const printBill = (b) => {
-    const area = document.getElementById('printAreaHistory');
-    if (!area) return;
-    area.innerHTML = `
-      <div class="pr-center pr-title">SKM STORES</div>
-      <div class="pr-center" style="font-size:10px;font-weight:700;margin-bottom:4px;">RETAIL INVOICE</div>
-      <div class="pr-meta"><div>BILL NO - ${b.billNo || ''}</div><div>DATE - ${new Date(b.timestamp).toLocaleDateString('en-GB')}</div><div>TIME - ${new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div></div>
-      <div class="pr-line"></div>
-      <div class="pr-row pr-table-head" style="grid-template-columns:5% 40% 6% 21% 22%;column-gap:2px;"><span>#</span><span>ITEM</span><span style="text-align:center">Q</span><span style="text-align:right">RATE</span><span style="text-align:right">TOTAL</span></div>
-      <div class="pr-line"></div>
-      ${(b.items || []).map((it, idx) => `<div class="pr-row pr-item" style="grid-template-columns:5% 40% 6% 21% 22%;column-gap:2px;margin-top:2px;"><span>${idx + 1}</span><span>${it.name}</span><span style="text-align:center">${it.qty}</span><span style="text-align:right">₹${Number(it.price).toFixed(2)}</span><span style="text-align:right">₹${(it.qty * it.price).toFixed(2)}</span></div>`).join('')}
-      <div class="pr-line"></div>
-      <div class="pr-row pr-total" style="grid-template-columns:1fr auto;"><span>GRAND TOTAL</span><span>₹${b.total.toFixed(2)}</span></div>
-      <div class="pr-line"></div>
-      <div class="pr-center pr-thanks">THANK YOU VISIT AGAIN</div>
-    `;
-    setTimeout(() => window.print(), 80);
+    if (typeof window !== 'undefined') {
+      printReceipt(b, storeProfile);
+    }
   };
 
   const grouped = groupByDate(bills);
@@ -104,7 +92,6 @@ export default function HistoryPage() {
           </>
         )}
       </main>
-      <div id="printAreaHistory" style={{ display: 'none' }} />
     </>
   );
 }

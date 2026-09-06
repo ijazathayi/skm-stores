@@ -1,37 +1,30 @@
 'use client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import {
+  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 /* ── constants ── */
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Not fixed'];
-const KEY = 'stockdesk.v1';
 
 /* ── utils ── */
 const uid = () => Math.random().toString(36).slice(2, 10);
 const money = (n) => '₹' + (Number(n) || 0).toFixed(2);
 const esc = (s) => String(s == null ? '' : s);
 
-function loadState() {
-  try {
-    const d = JSON.parse(localStorage.getItem(KEY));
-    if (d && Array.isArray(d.agencies)) return d;
-  } catch (e) {}
-  return { agencies: [], shop: 'My Grocery Shop' };
-}
-function saveState(state) {
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
-
 /* ── sub-components ── */
-
 function Toast({ message, visible }) {
   return (
     <div style={{
       position: 'fixed', left: '50%', bottom: 26,
       transform: visible ? 'translateX(-50%)' : 'translateX(-50%) translateY(20px)',
-      background: '#16201a', color: '#fff', padding: '11px 18px', borderRadius: 10,
+      background: 'rgba(58,36,21,.92)', color: '#fff', padding: '11px 20px', borderRadius: 12,
       opacity: visible ? 1 : 0, transition: '.25s', zIndex: 90, fontSize: 14,
-      pointerEvents: 'none',
+      boxShadow: '0 8px 24px rgba(0,0,0,.2)', pointerEvents: 'none',
+      backdropFilter: 'blur(8px)'
     }}>
       {message}
     </div>
@@ -49,14 +42,16 @@ function Modal({ open, onClose, children, maxWidth = 860 }) {
     <div
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
-        position: 'fixed', inset: 0, background: 'rgba(16,26,20,.45)',
+        position: 'fixed', inset: 0, background: 'rgba(58,36,21,.45)',
         display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
         padding: '34px 16px', zIndex: 60, overflowY: 'auto',
+        backdropFilter: 'blur(4px)'
       }}
     >
       <div style={{
-        background: '#fff', borderRadius: 16, width: '100%', maxWidth,
-        boxShadow: '0 24px 60px rgba(0,0,0,.28)',
+        background: '#fffdfa', borderRadius: 20, width: '100%', maxWidth,
+        boxShadow: '0 24px 60px rgba(90,40,15,.25)', border: '1px solid rgba(122,84,48,.18)',
+        overflow: 'hidden'
       }}>
         {children}
       </div>
@@ -66,7 +61,8 @@ function Modal({ open, onClose, children, maxWidth = 860 }) {
 
 /* ── main component ── */
 export default function AgencyOrderApp() {
-  const [state, setState] = useState(null); // null = not loaded yet
+  const [agencies, setAgencies] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('name');
   const [filterDay, setFilterDay] = useState('');
@@ -80,6 +76,7 @@ export default function AgencyOrderApp() {
   const [aPhone, setAPhone] = useState('');
   const [aPerson, setAPerson] = useState('');
   const [aDay, setADay] = useState('Monday');
+  const [isSavingAgency, setIsSavingAgency] = useState(false);
 
   // Products modal
   const [productModal, setProductModal] = useState(false);
@@ -88,6 +85,7 @@ export default function AgencyOrderApp() {
   const [pUnit, setPUnit] = useState('');
   const [pWhole, setPWhole] = useState('');
   const [pRetail, setPRetail] = useState('');
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Order modal
   const [orderModal, setOrderModal] = useState(false);
@@ -95,12 +93,26 @@ export default function AgencyOrderApp() {
   const [priceMode, setPriceMode] = useState('wholesale');
   const [cart, setCart] = useState({});
 
-  // File input ref for import
-  const fileRef = useRef(null);
-
-  /* load from localStorage once */
+  // Firestore Realtime Listener
   useEffect(() => {
-    setState(loadState());
+    const q = query(collection(db, 'agencies'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({
+          id: d.id,
+          products: [],
+          ...d.data()
+        }));
+        setAgencies(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error fetching agencies:', err);
+        setLoading(false);
+      }
+    );
+    return () => unsubscribe();
   }, []);
 
   const showToast = useCallback((msg) => {
@@ -109,31 +121,24 @@ export default function AgencyOrderApp() {
     toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), 2200);
   }, []);
 
-  const persist = useCallback((newState) => {
-    setState(newState);
-    saveState(newState);
-  }, []);
-
-  if (!state) return null; // wait for localStorage
-
-  const agency = (id) => state.agencies.find((a) => a.id === id);
+  const agency = (id) => agencies.find((a) => a.id === id);
   const priceOf = (p) => +(priceMode === 'retail' ? p.retail : p.wholesale) || 0;
 
   /* ── filtered list ── */
-  const filteredAgencies = [...state.agencies]
+  const filteredAgencies = [...agencies]
     .filter((a) => {
       if (filterDay && a.day !== filterDay) return false;
       const q = search.trim().toLowerCase();
       if (!q) return true;
       return (
-        (a.name + ' ' + a.phone + ' ' + (a.person || '')).toLowerCase().includes(q) ||
-        a.products.some((p) => p.name.toLowerCase().includes(q))
+        (a.name + ' ' + (a.phone || '') + ' ' + (a.person || '')).toLowerCase().includes(q) ||
+        (Array.isArray(a.products) && a.products.some((p) => (p.name || '').toLowerCase().includes(q)))
       );
     })
     .sort((a, b) => {
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      if (sortBy === 'day') return DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.name.localeCompare(b.name);
-      if (sortBy === 'products') return b.products.length - a.products.length;
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'day') return DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'products') return ((b.products && b.products.length) || 0) - ((a.products && a.products.length) || 0);
       return (b.created || 0) - (a.created || 0);
     });
 
@@ -142,58 +147,99 @@ export default function AgencyOrderApp() {
     setEditingId(id || null);
     const a = id ? agency(id) : null;
     setAName(a ? a.name : '');
-    setAPhone(a ? a.phone : '');
+    setAPhone(a ? (a.phone || '') : '');
     setAPerson(a ? (a.person || '') : '');
-    setADay(a ? a.day : 'Monday');
+    setADay(a ? (a.day || 'Monday') : 'Monday');
     setAgencyModal(true);
   }
 
-  function saveAgency() {
+  async function saveAgency() {
     const name = aName.trim();
     if (!name) return showToast('Agency name is required');
-    const data = { name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay };
-    if (editingId) {
-      const updated = state.agencies.map((a) => a.id === editingId ? { ...a, ...data } : a);
-      persist({ ...state, agencies: updated });
-    } else {
-      persist({ ...state, agencies: [...state.agencies, { id: uid(), created: Date.now(), products: [], ...data }] });
+    const data = {
+      name,
+      phone: aPhone.trim(),
+      person: aPerson.trim(),
+      day: aDay
+    };
+
+    try {
+      setIsSavingAgency(true);
+      if (editingId) {
+        await updateDoc(doc(db, 'agencies', editingId), data);
+      } else {
+        await addDoc(collection(db, 'agencies'), {
+          ...data,
+          created: Date.now(),
+          products: []
+        });
+      }
+      setAgencyModal(false);
+      showToast('Saved successfully');
+    } catch (err) {
+      alert('Error saving agency: ' + err.message);
+    } finally {
+      setIsSavingAgency(false);
     }
-    setAgencyModal(false);
-    showToast('Saved');
   }
 
-  function deleteAgency(id) {
+  async function deleteAgency(id) {
     const a = agency(id);
-    if (!confirm(`Delete "${a.name}" and its ${a.products.length} products?`)) return;
-    persist({ ...state, agencies: state.agencies.filter((x) => x.id !== id) });
-    showToast('Agency deleted');
+    if (!a) return;
+    const prodCount = (a.products && a.products.length) || 0;
+    if (!confirm(`Delete "${a.name}" and its ${prodCount} products?`)) return;
+    try {
+      await deleteDoc(doc(db, 'agencies', id));
+      showToast('Agency deleted');
+    } catch (err) {
+      alert('Error deleting agency: ' + err.message);
+    }
   }
 
-  /* ── products ── */
+  /* ── products CRUD ── */
   function openProducts(id) {
     setProductAgencyId(id);
     setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
     setProductModal(true);
   }
 
-  function addProduct() {
+  async function addProduct() {
     const name = pName.trim();
     if (!name) return showToast('Product name is required');
-    const updated = state.agencies.map((a) =>
-      a.id === productAgencyId
-        ? { ...a, products: [...a.products, { id: uid(), name, unit: pUnit.trim(), wholesale: +pWhole || 0, retail: +pRetail || 0 }] }
-        : a
-    );
-    persist({ ...state, agencies: updated });
-    setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
-    showToast('Product added');
+    const a = agency(productAgencyId);
+    if (!a) return;
+
+    const newProduct = {
+      id: uid(),
+      name,
+      unit: pUnit.trim(),
+      wholesale: +pWhole || 0,
+      retail: +pRetail || 0
+    };
+
+    try {
+      setIsSavingProduct(true);
+      const updatedProducts = [...(a.products || []), newProduct];
+      await updateDoc(doc(db, 'agencies', productAgencyId), { products: updatedProducts });
+      setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
+      showToast('Product added');
+    } catch (err) {
+      alert('Error adding product: ' + err.message);
+    } finally {
+      setIsSavingProduct(false);
+    }
   }
 
-  function removeProduct(agencyId, productId) {
-    const updated = state.agencies.map((a) =>
-      a.id === agencyId ? { ...a, products: a.products.filter((p) => p.id !== productId) } : a
-    );
-    persist({ ...state, agencies: updated });
+  async function removeProduct(agencyId, productId) {
+    const a = agency(agencyId);
+    if (!a) return;
+    try {
+      const updatedProducts = (a.products || []).filter((p) => p.id !== productId);
+      await updateDoc(doc(db, 'agencies', agencyId), { products: updatedProducts });
+      showToast('Product removed');
+    } catch (err) {
+      alert('Error removing product: ' + err.message);
+    }
   }
 
   /* ── order ── */
@@ -206,7 +252,7 @@ export default function AgencyOrderApp() {
 
   function cartLines(agencyId, currentCart, mode) {
     const a = agency(agencyId);
-    if (!a) return [];
+    if (!a || !Array.isArray(a.products)) return [];
     return a.products
       .filter((p) => currentCart[p.id] > 0)
       .map((p) => {
@@ -224,7 +270,7 @@ export default function AgencyOrderApp() {
       lines,
       total: lines.reduce((s, l) => s + l.amount, 0),
       qty: lines.reduce((s, l) => s + l.qty, 0),
-      date: new Date().toLocaleString(),
+      date: new Date().toLocaleString('en-IN'),
       mode: mode === 'retail' ? 'Retail rates' : 'Wholesale rates',
     };
   }
@@ -241,13 +287,13 @@ export default function AgencyOrderApp() {
 
   function a4Template(d) {
     return `<!doctype html><html><head><meta charset="utf-8"><title>Purchase list - ${esc(d.agency.name)}</title><style>
-  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;margin:32px;color:#16201a}
-  h1{margin:0 0 4px;font-size:22px}.sub{color:#5b6b60;font-size:13px}
+  body{font-family:'Segoe UI',system-ui,Arial,sans-serif;margin:32px;color:#3a2415}
+  h1{margin:0 0 4px;font-size:22px;color:#c2410c}.sub{color:#8a6a4f;font-size:13px}
   table{width:100%;border-collapse:collapse;margin-top:22px}
-  th,td{border-bottom:1px solid #ddd;padding:9px 6px;font-size:13px;text-align:left}
-  th{background:#f1f4f0;text-transform:uppercase;font-size:11px;letter-spacing:.6px}
-  .num{text-align:right}tfoot td{font-weight:700;font-size:15px;border-top:2px solid #16201a}
-  .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1f6f4a;padding-bottom:12px}
+  th,td{border-bottom:1px solid #e0d0c0;padding:9px 6px;font-size:13px;text-align:left}
+  th{background:#f8f2ea;text-transform:uppercase;font-size:11px;letter-spacing:.6px;color:#8a6a4f}
+  .num{text-align:right}tfoot td{font-weight:700;font-size:15px;border-top:2px solid #3a2415}
+  .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #c2410c;padding-bottom:12px}
   </style></head><body>
   <div class="hd"><div><h1>${esc(d.agency.name)}</h1>
   <div class="sub">${esc(d.agency.day)} • ${esc(d.agency.phone || '')}${d.agency.person ? ' • ' + esc(d.agency.person) : ''}</div></div>
@@ -290,30 +336,30 @@ export default function AgencyOrderApp() {
     const x = canvas.getContext('2d');
     x.scale(dpr, dpr);
     const H = canvas.height / dpr;
-    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
-    x.fillStyle = '#1f6f4a'; x.fillRect(0, 0, W, 108);
+    x.fillStyle = '#fffdfa'; x.fillRect(0, 0, W, H);
+    x.fillStyle = '#c2410c'; x.fillRect(0, 0, W, 108);
     x.fillStyle = '#fff'; x.font = '700 26px Segoe UI, Arial'; x.fillText(d.agency.name.slice(0, 34), pad, 50);
-    x.font = '14px Segoe UI, Arial'; x.fillStyle = 'rgba(255,255,255,.85)';
+    x.font = '14px Segoe UI, Arial'; x.fillStyle = 'rgba(255,255,255,.9)';
     x.fillText(`${d.agency.day}  •  ${d.agency.phone || ''}`, pad, 76);
     x.textAlign = 'right'; x.fillText(d.mode, W - pad, 50); x.fillText(d.date, W - pad, 76); x.textAlign = 'left';
     let y = head - 42;
-    x.fillStyle = '#5b6b60'; x.font = '700 12px Segoe UI, Arial';
+    x.fillStyle = '#8a6a4f'; x.font = '700 12px Segoe UI, Arial';
     x.fillText('PRODUCT', pad, y); x.textAlign = 'right'; x.fillText('QTY', W - 330, y); x.fillText('RATE', W - 190, y); x.fillText('AMOUNT', W - pad, y); x.textAlign = 'left';
-    y += 12; x.strokeStyle = '#dfe4dc'; x.beginPath(); x.moveTo(pad, y); x.lineTo(W - pad, y); x.stroke();
+    y += 12; x.strokeStyle = '#e0d0c0'; x.beginPath(); x.moveTo(pad, y); x.lineTo(W - pad, y); x.stroke();
     y += 26;
     d.lines.forEach((l, i) => {
-      if (i % 2) { x.fillStyle = '#f6f8f5'; x.fillRect(pad - 8, y - 20, W - 2 * pad + 16, rowH - 4); }
-      x.fillStyle = '#16201a'; x.font = '15px Segoe UI, Arial'; x.fillText(l.name.slice(0, 36), pad, y);
+      if (i % 2) { x.fillStyle = '#f8f2ea'; x.fillRect(pad - 8, y - 20, W - 2 * pad + 16, rowH - 4); }
+      x.fillStyle = '#3a2415'; x.font = '15px Segoe UI, Arial'; x.fillText(l.name.slice(0, 36), pad, y);
       x.textAlign = 'right';
       x.fillText(String(l.qty) + ' ' + (l.unit || ''), W - 330, y);
       x.fillText(l.rate.toFixed(2), W - 190, y);
       x.font = '700 15px Segoe UI, Arial'; x.fillText(l.amount.toFixed(2), W - pad, y); x.textAlign = 'left';
       y += rowH;
     });
-    y += 6; x.strokeStyle = '#16201a'; x.lineWidth = 2; x.beginPath(); x.moveTo(pad, y); x.lineTo(W - pad, y); x.stroke();
-    y += 34; x.fillStyle = '#16201a'; x.font = '700 20px Segoe UI, Arial'; x.fillText('Total', pad, y);
+    y += 6; x.strokeStyle = '#3a2415'; x.lineWidth = 2; x.beginPath(); x.moveTo(pad, y); x.lineTo(W - pad, y); x.stroke();
+    y += 34; x.fillStyle = '#3a2415'; x.font = '700 20px Segoe UI, Arial'; x.fillText('Total', pad, y);
     x.textAlign = 'right'; x.fillText('₹' + d.total.toFixed(2), W - pad, y);
-    x.font = '14px Segoe UI, Arial'; x.fillStyle = '#5b6b60'; y += 26;
+    x.font = '14px Segoe UI, Arial'; x.fillStyle = '#8a6a4f'; y += 26;
     x.fillText(`${d.lines.length} items  •  ${d.qty} units`, W - pad, y); x.textAlign = 'left';
 
     canvas.toBlob(async (blob) => {
@@ -330,35 +376,7 @@ export default function AgencyOrderApp() {
     }, 'image/png');
   }
 
-  /* ── backup / restore ── */
-  function exportBackup() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'stock-desk-backup.json';
-    a.click();
-    showToast('Backup downloaded');
-  }
-
-  function importBackup(e) {
-    const f = e.target.files[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      try {
-        const d = JSON.parse(r.result);
-        if (!Array.isArray(d.agencies)) throw new Error('invalid');
-        persist(d);
-        showToast('Data restored');
-      } catch {
-        showToast('That file could not be read');
-      }
-    };
-    r.readAsText(f);
-    e.target.value = '';
-  }
-
-  /* ── order panel helpers ── */
+  /* ── order panel calculations ── */
   const currentLines = orderModal ? cartLines(orderAgencyId, cart, priceMode) : [];
   const orderCount = currentLines.length;
   const orderQty = currentLines.reduce((s, l) => s + l.qty, 0);
@@ -366,37 +384,49 @@ export default function AgencyOrderApp() {
   const orderAgency = orderAgencyId ? agency(orderAgencyId) : null;
   const productAgency = productAgencyId ? agency(productAgencyId) : null;
 
-  /* ─────────────────────────────── JSX ─────────────────────────────── */
   return (
-    <div style={{ background: '#f4f6f3', minHeight: '100vh', fontFamily: "'Segoe UI',system-ui,sans-serif", color: '#16201a' }}>
+    <div style={{ minHeight: '100vh', color: '#3a2415', fontFamily: 'Figtree, system-ui, sans-serif', background: 'linear-gradient(135deg,#fbe9cf,#f6d3b4 45%,#f2b9ac)', overflowX: 'hidden' }}>
 
-      {/* Header */}
-      <header style={{ background: '#1f6f4a', color: '#fff', padding: '18px 0', position: 'sticky', top: 0, zIndex: 40, boxShadow: '0 2px 14px rgba(15,61,40,.18)' }}>
-        <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11, fontWeight: 700, fontSize: 19 }}>
-            <span style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(255,255,255,.16)', display: 'grid', placeItems: 'center', fontSize: 16 }}>◆</span>
-            <span>Stock Desk<small style={{ display: 'block', fontWeight: 400, fontSize: 11, opacity: .8, letterSpacing: '.6px', textTransform: 'uppercase' }}>Agency purchase manager</small></span>
+      {/* Glow blobs */}
+      <div style={{ position: 'fixed', width: 520, height: 520, right: -140, top: -140, background: 'rgba(224,163,37,.45)', borderRadius: '50%', filter: 'blur(90px)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', width: 480, height: 480, left: -140, bottom: -160, background: 'rgba(226,120,110,.35)', borderRadius: '50%', filter: 'blur(90px)', pointerEvents: 'none', zIndex: 0 }} />
+
+      {/* Topbar Header */}
+      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '20px clamp(16px,4vw,40px)', position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 14, overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg,#c2410c,#e8b04b)',
+            boxShadow: '0 10px 24px rgba(194,65,12,.3)', flexShrink: 0
+          }}>
+            <Image src="/skm-logo.png" alt="SKM Stores" width={44} height={44} style={{ objectFit: 'cover' }} />
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <Link href="/" style={{ background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.28)', color: '#fff', borderRadius: 10, padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}>← Home</Link>
-            <button onClick={exportBackup} style={ghostLightBtn}>Backup</button>
-            <button onClick={() => fileRef.current?.click()} style={ghostLightBtn}>Restore</button>
-            <button onClick={() => openAgency(null)} style={ghostLightBtn}>+ New agency</button>
-            <input type="file" ref={fileRef} accept="application/json" hidden onChange={importBackup} />
+          <div>
+            <p style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, lineHeight: 1 }}>SKM Stores</p>
+            <p style={{ margin: '2px 0 0', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a6a4f' }}>
+              Agency Orders {loading ? '• Loading...' : '• Synced Live'}
+            </p>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link href="/" style={topbarBtn}>← Home</Link>
+          <button onClick={() => openAgency(null)} style={brandBtn}>+ New agency</button>
         </div>
       </header>
 
-      {/* Toolbar */}
-      <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px 80px' }}>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', margin: '26px 0 18px' }}>
+      {/* Main Container */}
+      <main style={{ padding: '0 clamp(16px,4vw,40px) 56px', maxWidth: 1240, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+
+        {/* Toolbar */}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap', margin: '14px 0 20px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 220 }}>
             <label style={labelStyle}>Search</label>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} style={inputStyle} placeholder="Agency, phone or product…" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} style={fieldStyle} placeholder="Agency, phone or product…" />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={labelStyle}>Sort by</label>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={inputStyle}>
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={fieldStyle}>
               <option value="name">Agency name (A–Z)</option>
               <option value="day">Visit day (Mon → Sun)</option>
               <option value="products">Most products</option>
@@ -405,7 +435,7 @@ export default function AgencyOrderApp() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={labelStyle}>Visit day</label>
-            <select value={filterDay} onChange={(e) => setFilterDay(e.target.value)} style={inputStyle}>
+            <select value={filterDay} onChange={(e) => setFilterDay(e.target.value)} style={fieldStyle}>
               <option value="">All days</option>
               {DAYS.map((d) => <option key={d}>{d}</option>)}
             </select>
@@ -414,30 +444,45 @@ export default function AgencyOrderApp() {
 
         {/* Agency grid */}
         {filteredAgencies.length === 0 ? (
-          <div style={{ border: '1px dashed #dfe4dc', borderRadius: 14, padding: 44, textAlign: 'center', color: '#5b6b60', background: '#fff' }}>
-            <h3 style={{ margin: '0 0 6px' }}>No agencies yet</h3>
-            <p style={{ margin: '0 0 16px' }}>Add the agencies that visit your shop, then list their products with wholesale and retail prices.</p>
-            <button onClick={() => openAgency(null)} style={primaryBtn}>+ Add your first agency</button>
+          <div style={{ ...cardStyle, textAlign: 'center', padding: '44px 20px', color: '#8a6a4f' }}>
+            <h3 style={{ margin: '0 0 6px', fontFamily: 'Georgia, serif', fontSize: 20, color: '#3a2415' }}>
+              {loading ? 'Loading agencies...' : 'No agencies yet'}
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: 14 }}>
+              {loading ? 'Please wait while data is synced with Firebase.' : 'Add the agencies that supply your shop, then list their products with wholesale and retail prices.'}
+            </p>
+            {!loading && (
+              <button onClick={() => openAgency(null)} style={brandBtn}>+ Add your first agency</button>
+            )}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
             {filteredAgencies.map((a) => {
-              const ws = a.products.length ? Math.min(...a.products.map((p) => +p.wholesale || 0)) : 0;
+              const prods = Array.isArray(a.products) ? a.products : [];
+              const ws = prods.length ? Math.min(...prods.map((p) => +p.wholesale || 0)) : 0;
               return (
-                <article key={a.id} style={{ background: '#fff', border: '1px solid #dfe4dc', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(22,32,26,.06),0 8px 24px rgba(22,32,26,.06)' }}>
-                  <div style={{ padding: '16px 18px' }}>
-                    <h3 style={{ margin: '0 0 3px', fontSize: 17 }}>{esc(a.name)}</h3>
-                    <div style={{ color: '#5b6b60', fontSize: 13, display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
-                      <span style={{ background: '#fbf1e0', color: '#a3671a', borderRadius: 999, padding: '3px 9px', fontSize: 12, fontWeight: 700 }}>{a.day}</span>
-                      <span style={{ background: '#e6f1ea', color: '#0f3d28', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>{a.products.length} products</span>
+                <article key={a.id} style={cardStyle}>
+                  <div style={{ padding: '0 0 14px' }}>
+                    <h3 style={{ margin: '0 0 4px', fontSize: 18, fontFamily: 'Georgia, serif' }}>{esc(a.name)}</h3>
+                    <div style={{ color: '#8a6a4f', fontSize: 13, display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                      <span style={{ background: 'rgba(224,163,37,.22)', color: '#99600a', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                        {a.day || 'Not fixed'}
+                      </span>
+                      <span style={{ background: 'rgba(194,65,12,.12)', color: '#a8321c', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+                        {prods.length} products
+                      </span>
                     </div>
-                    <div style={{ color: '#5b6b60', fontSize: 13, display: 'flex', gap: 12, marginTop: 6 }}>
+                    <div style={{ color: '#8a6a4f', fontSize: 13, display: 'flex', gap: 12, marginTop: 8 }}>
                       <span>Ph: {esc(a.phone || '—')}</span>
                       {a.person && <span>Contact: {esc(a.person)}</span>}
                     </div>
-                    {a.products.length > 0 && <div style={{ color: '#5b6b60', fontSize: 13, marginTop: 6 }}>From {money(ws)} wholesale</div>}
+                    {prods.length > 0 && (
+                      <div style={{ color: '#8a6a4f', fontSize: 13, marginTop: 6 }}>
+                        From <strong style={{ color: '#3a2415' }}>{money(ws)}</strong> wholesale
+                      </div>
+                    )}
                   </div>
-                  <div style={{ borderTop: '1px solid #dfe4dc', padding: '11px 18px', display: 'flex', gap: 8, background: '#fbfcfa', flexWrap: 'wrap' }}>
+                  <div style={{ borderTop: '1px solid rgba(122,84,48,.18)', paddingTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button onClick={() => openOrder(a.id)} style={primarySmBtn}>Make list</button>
                     <button onClick={() => openProducts(a.id)} style={smBtn}>Products</button>
                     <button onClick={() => openAgency(a.id)} style={smBtn}>Edit</button>
@@ -448,62 +493,83 @@ export default function AgencyOrderApp() {
             })}
           </div>
         )}
-      </div>
+      </main>
 
-      {/* ── Agency modal ── */}
+      {/* ── Agency Modal ── */}
       <Modal open={agencyModal} onClose={() => setAgencyModal(false)} maxWidth={560}>
         <div style={sheetHeaderStyle}>
-          <h3 style={{ margin: 0, fontSize: 18 }}>{editingId ? 'Edit agency' : 'New agency'}</h3>
+          <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'Georgia, serif' }}>{editingId ? 'Edit agency' : 'New agency'}</h3>
         </div>
         <div style={{ padding: '20px 22px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-            {[['Agency name', aName, setAName, 'text', 'Sri Balaji Agencies'],
-              ['Phone number', aPhone, setAPhone, 'text', '98765 43210'],
-              ['Contact person (optional)', aPerson, setAPerson, 'text', 'Ramesh']].map(([label, val, setter, type, ph]) => (
-              <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={labelStyle}>{label}</label>
-                <input value={val} onChange={(e) => setter(e.target.value)} type={type} placeholder={ph} style={inputStyle} />
-              </div>
-            ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Agency name</label>
+              <input value={aName} onChange={(e) => setAName(e.target.value)} placeholder="Sri Balaji Agencies" style={fieldStyle} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Phone number</label>
+              <input value={aPhone} onChange={(e) => setAPhone(e.target.value)} placeholder="98765 43210" style={fieldStyle} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Contact person (optional)</label>
+              <input value={aPerson} onChange={(e) => setAPerson(e.target.value)} placeholder="Ramesh" style={fieldStyle} />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={labelStyle}>Visit day</label>
-              <select value={aDay} onChange={(e) => setADay(e.target.value)} style={inputStyle}>
+              <select value={aDay} onChange={(e) => setADay(e.target.value)} style={fieldStyle}>
                 {DAYS.map((d) => <option key={d}>{d}</option>)}
               </select>
             </div>
           </div>
         </div>
         <div style={sheetFooterStyle}>
-          <button onClick={() => setAgencyModal(false)} style={outlineBtn}>Cancel</button>
-          <button onClick={saveAgency} style={primaryBtn}>Save agency</button>
+          <button onClick={() => setAgencyModal(false)} style={topbarBtn}>Cancel</button>
+          <button onClick={saveAgency} disabled={isSavingAgency} style={brandBtn}>
+            {isSavingAgency ? 'Saving...' : 'Save agency'}
+          </button>
         </div>
       </Modal>
 
-      {/* ── Products modal ── */}
+      {/* ── Products Modal ── */}
       <Modal open={productModal} onClose={() => setProductModal(false)}>
         <div style={sheetHeaderStyle}>
-          <h3 style={{ margin: 0, fontSize: 18 }}>{productAgency ? productAgency.name + ' — products' : 'Products'}</h3>
-          <span style={{ fontSize: 12, color: '#5b6b60', marginLeft: 8 }}>{productAgency ? productAgency.day + ' • ' + (productAgency.phone || 'no phone') : ''}</span>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'Georgia, serif' }}>
+              {productAgency ? productAgency.name + ' — Products' : 'Products'}
+            </h3>
+            <span style={{ fontSize: 12, color: '#8a6a4f' }}>
+              {productAgency ? productAgency.day + ' • ' + (productAgency.phone || 'No phone') : ''}
+            </span>
+          </div>
         </div>
         <div style={{ padding: '20px 22px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, alignItems: 'end' }}>
-            {[['Product', pName, setPName, 'text', 'Toor Dal 1kg'],
-              ['Unit', pUnit, setPUnit, 'text', 'pkt / kg / box'],
-              ['Wholesale ₹', pWhole, setPWhole, 'number', ''],
-              ['Retail ₹', pRetail, setPRetail, 'number', '']].map(([label, val, setter, type, ph]) => (
-              <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={labelStyle}>{label}</label>
-                <input value={val} onChange={(e) => setter(e.target.value)} type={type} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.01' : undefined} placeholder={ph} style={inputStyle} />
-              </div>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12, alignItems: 'end' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Product</label>
+              <input value={pName} onChange={(e) => setPName(e.target.value)} placeholder="Toor Dal 1kg" style={fieldStyle} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Unit</label>
+              <input value={pUnit} onChange={(e) => setPUnit(e.target.value)} placeholder="pkt / kg / box" style={fieldStyle} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Wholesale ₹</label>
+              <input value={pWhole} onChange={(e) => setPWhole(e.target.value)} type="number" min="0" step="0.01" placeholder="0.00" style={fieldStyle} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={labelStyle}>Retail ₹</label>
+              <input value={pRetail} onChange={(e) => setPRetail(e.target.value)} type="number" min="0" step="0.01" placeholder="0.00" style={fieldStyle} />
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={labelStyle}>&nbsp;</label>
-              <button onClick={addProduct} style={primaryBtn}>Add product</button>
+              <button onClick={addProduct} disabled={isSavingProduct} style={{ ...brandBtn, padding: '11px 16px' }}>
+                {isSavingProduct ? 'Adding...' : 'Add product'}
+              </button>
             </div>
           </div>
 
-          <div style={{ marginTop: 18, overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ marginTop: 20, overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 540 }}>
               <thead>
                 <tr>
                   {['Product', 'Unit', 'Wholesale', 'Retail', 'Margin', ''].map((h, i) => (
@@ -512,15 +578,17 @@ export default function AgencyOrderApp() {
                 </tr>
               </thead>
               <tbody>
-                {productAgency && productAgency.products.length === 0 ? (
-                  <tr><td colSpan={6} style={{ color: '#5b6b60', padding: '22px 8px' }}>No products listed for this agency yet.</td></tr>
+                {productAgency && (!productAgency.products || productAgency.products.length === 0) ? (
+                  <tr><td colSpan={6} style={{ color: '#8a6a4f', padding: '22px 12px', textAlign: 'center' }}>No products listed for this agency yet.</td></tr>
                 ) : productAgency && productAgency.products.map((p) => (
                   <tr key={p.id}>
                     <td style={tdStyle}>{esc(p.name)}</td>
                     <td style={tdStyle}>{esc(p.unit || '—')}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(p.wholesale)}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(p.retail)}</td>
-                    <td style={{ ...tdStyle, textAlign: 'right' }}>{money((+p.retail || 0) - (+p.wholesale || 0))}</td>
+                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: (+p.retail || 0) >= (+p.wholesale || 0) ? '#3f7d3f' : '#a8321c' }}>
+                      {money((+p.retail || 0) - (+p.wholesale || 0))}
+                    </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
                       <button onClick={() => removeProduct(productAgencyId, p.id)} style={dangerSmBtn}>Remove</button>
                     </td>
@@ -531,20 +599,27 @@ export default function AgencyOrderApp() {
           </div>
         </div>
         <div style={sheetFooterStyle}>
-          <button onClick={() => setProductModal(false)} style={outlineBtn}>Done</button>
+          <button onClick={() => setProductModal(false)} style={brandBtn}>Done</button>
         </div>
       </Modal>
 
-      {/* ── Order modal ── */}
+      {/* ── Order Modal ── */}
       <Modal open={orderModal} onClose={() => setOrderModal(false)}>
         <div style={{ ...sheetHeaderStyle, gap: 12 }}>
-          <h3 style={{ margin: 0, fontSize: 18 }}>{orderAgency ? orderAgency.name + ' — purchase list' : 'Purchase list'}</h3>
-          <div style={{ marginLeft: 'auto', display: 'inline-flex', border: '1px solid #dfe4dc', borderRadius: 9, overflow: 'hidden' }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontFamily: 'Georgia, serif' }}>
+            {orderAgency ? orderAgency.name + ' — Purchase List' : 'Purchase List'}
+          </h3>
+          <div style={{ marginLeft: 'auto', display: 'inline-flex', border: '1px solid rgba(122,84,48,.22)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
             {['wholesale', 'retail'].map((m) => (
               <button
                 key={m}
                 onClick={() => setPriceMode(m)}
-                style={{ border: 0, background: priceMode === m ? '#1f6f4a' : '#fff', color: priceMode === m ? '#fff' : '#16201a', padding: '7px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+                style={{
+                  border: 0,
+                  background: priceMode === m ? 'linear-gradient(135deg,#c2410c,#e8b04b)' : 'transparent',
+                  color: priceMode === m ? '#fff' : '#3a2415',
+                  padding: '7px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 700
+                }}
               >
                 {m.charAt(0).toUpperCase() + m.slice(1)}
               </button>
@@ -552,8 +627,8 @@ export default function AgencyOrderApp() {
           </div>
         </div>
         <div style={{ padding: '20px 22px' }}>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
               <thead>
                 <tr>
                   {['Product', 'Unit', 'Rate', 'Qty', 'Amount'].map((h, i) => (
@@ -562,8 +637,8 @@ export default function AgencyOrderApp() {
                 </tr>
               </thead>
               <tbody>
-                {orderAgency && orderAgency.products.length === 0 ? (
-                  <tr><td colSpan={5} style={{ padding: '22px 8px', color: '#5b6b60' }}>Add products to this agency first.</td></tr>
+                {orderAgency && (!orderAgency.products || orderAgency.products.length === 0) ? (
+                  <tr><td colSpan={5} style={{ padding: '22px 12px', color: '#8a6a4f', textAlign: 'center' }}>Add products to this agency first.</td></tr>
                 ) : orderAgency && orderAgency.products.map((p) => {
                   const q = cart[p.id] || 0;
                   const rate = priceOf(p);
@@ -586,10 +661,10 @@ export default function AgencyOrderApp() {
                               return next;
                             });
                           }}
-                          style={{ width: 78, textAlign: 'right', border: '1px solid #dfe4dc', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14 }}
+                          style={{ width: 80, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }}
                         />
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{q > 0 ? money(q * rate) : '—'}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: q > 0 ? 600 : 400 }}>{q > 0 ? money(q * rate) : '—'}</td>
                     </tr>
                   );
                 })}
@@ -599,31 +674,31 @@ export default function AgencyOrderApp() {
 
           <div style={{ maxWidth: 340, marginLeft: 'auto', marginTop: 16 }}>
             {[['Items selected', orderCount], ['Total quantity', orderQty]].map(([label, val]) => (
-              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, padding: '6px 0' }}>
-                <span>{label}</span><strong>{val}</strong>
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, padding: '6px 0', color: '#8a6a4f' }}>
+                <span>{label}</span><strong style={{ color: '#3a2415' }}>{val}</strong>
               </div>
             ))}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, borderTop: '2px solid #16201a', marginTop: 8, paddingTop: 12 }}>
-              <span>Total</span><span>{money(orderTotal)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 800, borderTop: '2px solid #3a2415', marginTop: 8, paddingTop: 12 }}>
+              <span>Total</span><span style={{ color: '#c2410c' }}>{money(orderTotal)}</span>
             </div>
           </div>
         </div>
         <div style={sheetFooterStyle}>
-          <button onClick={() => setOrderModal(false)} style={outlineBtn}>Close</button>
-          <button onClick={() => setCart({})} style={outlineBtn}>Clear</button>
-          <button onClick={() => shareImage(orderAgencyId, cart, priceMode)} style={outlineBtn}>Save / share image</button>
+          <button onClick={() => setOrderModal(false)} style={topbarBtn}>Close</button>
+          <button onClick={() => setCart({})} style={topbarBtn}>Clear</button>
+          <button onClick={() => shareImage(orderAgencyId, cart, priceMode)} style={topbarBtn}>Save / share image</button>
           <button onClick={() => {
             const d = orderData(orderAgencyId, cart, priceMode);
             if (!d.lines.length) return showToast('Select at least one product');
             const w = prompt('Thermal paper width in mm (58 or 80)?', '80');
             if (!w) return;
             printHTML(thermalTemplate(d, Math.max(40, parseInt(w, 10) || 80)));
-          }} style={outlineBtn}>Thermal print</button>
+          }} style={topbarBtn}>Thermal print</button>
           <button onClick={() => {
             const d = orderData(orderAgencyId, cart, priceMode);
             if (!d.lines.length) return showToast('Select at least one product');
             printHTML(a4Template(d));
-          }} style={primaryBtn}>Print A4</button>
+          }} style={brandBtn}>Print A4</button>
         </div>
       </Modal>
 
@@ -633,15 +708,15 @@ export default function AgencyOrderApp() {
 }
 
 /* ── inline styles ── */
-const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.7px', color: '#5b6b60', fontWeight: 700 };
-const inputStyle = { border: '1px solid #dfe4dc', background: '#fff', borderRadius: 10, padding: '10px 12px', minWidth: 180, outline: 'none', fontSize: 14, fontFamily: 'inherit', width: '100%' };
-const primaryBtn = { background: '#1f6f4a', border: '1px solid #1f6f4a', color: '#fff', borderRadius: 10, padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 7 };
-const outlineBtn = { border: '1px solid #dfe4dc', background: '#fff', borderRadius: 10, padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 14, display: 'inline-flex', alignItems: 'center', gap: 7 };
-const smBtn = { border: '1px solid #dfe4dc', background: '#fff', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontWeight: 600, fontSize: 13 };
-const primarySmBtn = { ...smBtn, background: '#1f6f4a', border: '1px solid #1f6f4a', color: '#fff' };
-const dangerSmBtn = { ...smBtn, color: '#a32020', borderColor: '#eccaca', background: '#fdf3f3' };
-const ghostLightBtn = { background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.28)', color: '#fff', borderRadius: 10, padding: '9px 14px', cursor: 'pointer', fontWeight: 600, fontSize: 14 };
-const sheetHeaderStyle = { display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px', borderBottom: '1px solid #dfe4dc', flexWrap: 'wrap' };
-const sheetFooterStyle = { padding: '16px 22px', borderTop: '1px solid #dfe4dc', display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap', background: '#fbfcfa', borderRadius: '0 0 16px 16px' };
-const thStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.7px', color: '#5b6b60', padding: '10px 8px', borderBottom: '1px solid #dfe4dc' };
-const tdStyle = { padding: '10px 8px', borderBottom: '1px solid #dfe4dc', fontSize: 14 };
+const cardStyle = { background: 'rgba(255,251,244,.85)', border: '1px solid rgba(122,84,48,.18)', borderRadius: 20, padding: 20, backdropFilter: 'blur(12px)', boxShadow: '0 18px 40px rgba(122,84,48,.12)' };
+const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.8px', color: '#8a6a4f', fontWeight: 700 };
+const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.85)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
+const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 16px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+const smBtn = { border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#3a2415' };
+const primarySmBtn = { ...smBtn, background: 'linear-gradient(135deg,#c2410c,#e8b04b)', border: '1px solid transparent', color: '#fff' };
+const dangerSmBtn = { ...smBtn, color: '#a8321c', borderColor: 'rgba(168,50,28,.25)', background: 'rgba(168,50,28,.06)' };
+const sheetHeaderStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid rgba(122,84,48,.18)', flexWrap: 'wrap' };
+const sheetFooterStyle = { padding: '16px 22px', borderTop: '1px solid rgba(122,84,48,.18)', display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap', background: 'rgba(255,251,244,.95)' };
+const thStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.8px', color: '#8a6a4f', padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,251,244,.6)' };
+const tdStyle = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', fontSize: 14 };

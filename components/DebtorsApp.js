@@ -1,191 +1,240 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import {
+  collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy, writeBatch, getDocs, where
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
-/* ── constants ── */
-const KEY = 'skm-debtors-v1';
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+/* ── helpers ── */
 const today = () => new Date().toISOString().slice(0, 10);
-const money = (n) => '₹' + Math.round(n).toLocaleString('en-IN');
-const fmtDate = (d) =>
-  new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
-const initials = (name) =>
-  name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('');
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-/* ── state helpers ── */
-function loadState() {
+const money = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
+const fmtDate = (d) => {
+  if (!d) return '—';
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || '{}');
-    return { customers: raw.customers || [], entries: raw.entries || [] };
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
   } catch {
-    return { customers: [], entries: [] };
+    return d;
   }
+};
+const initials = (name) =>
+  name ? name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') : '?';
+function escapeHtml(s) {
+  return String(s == null ? '' : s);
 }
-function saveState(state) {
-  localStorage.setItem(KEY, JSON.stringify(state));
-}
 
-const entriesOf = (state, id) =>
-  state.entries
-    .filter((e) => e.customerId === id)
-    .sort((a, b) => (a.date + a.id).localeCompare(b.date + b.id));
-
-const balanceOf = (state, id) =>
-  entriesOf(state, id).reduce((t, e) => t + (e.kind === 'debt' ? e.amount : -e.amount), 0);
-
-/* ── main component ── */
 export default function DebtorsApp() {
-  const [state, setState] = useState(null);
+  const [customers, setCustomers] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Customer form
   const [custName, setCustName] = useState('');
   const [custMobile, setCustMobile] = useState('');
+  const [isSubmittingCust, setIsSubmittingCust] = useState(false);
 
   // Debt form
   const [debtProduct, setDebtProduct] = useState('');
   const [debtQty, setDebtQty] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
-  const [debtDate, setDebtDate] = useState('');
+  const [debtDate, setDebtDate] = useState(today());
   const [debtNote, setDebtNote] = useState('');
+  const [isSubmittingDebt, setIsSubmittingDebt] = useState(false);
 
   // Payment form
   const [payAmount, setPayAmount] = useState('');
-  const [payDate, setPayDate] = useState('');
+  const [payDate, setPayDate] = useState(today());
   const [payNote, setPayNote] = useState('');
+  const [isSubmittingPay, setIsSubmittingPay] = useState(false);
 
-  const fileRef = useRef(null);
-
+  // Firestore Realtime Listeners
   useEffect(() => {
-    const loaded = loadState();
-    setState(loaded);
-    setDebtDate(today());
-    setPayDate(today());
+    const unsubCust = onSnapshot(
+      query(collection(db, 'debtors_customers'), orderBy('name', 'asc')),
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setCustomers(list);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error fetching debtors customers:', err);
+        setLoading(false);
+      }
+    );
+
+    const unsubEntries = onSnapshot(
+      collection(db, 'debtors_entries'),
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setEntries(list);
+      },
+      (err) => {
+        console.error('Error fetching debtors entries:', err);
+      }
+    );
+
+    return () => {
+      unsubCust();
+      unsubEntries();
+    };
   }, []);
 
-  const persist = useCallback((newState) => {
-    setState(newState);
-    saveState(newState);
-  }, []);
+  // Compute stats
+  const totalDebt = entries.filter((e) => e.kind === 'debt').reduce((t, e) => t + (Number(e.amount) || 0), 0);
+  const totalPaid = entries.filter((e) => e.kind === 'payment').reduce((t, e) => t + (Number(e.amount) || 0), 0);
 
-  if (!state) return null;
+  const getCustomerEntries = useCallback((cId) => {
+    return entries
+      .filter((e) => e.customerId === cId)
+      .sort((a, b) => {
+        const da = (a.date || '') + (a.timestamp || a.id);
+        const db = (b.date || '') + (b.timestamp || b.id);
+        return da.localeCompare(db);
+      });
+  }, [entries]);
 
-  /* ── computed values ── */
-  const totalDebt = state.entries.filter((e) => e.kind === 'debt').reduce((t, e) => t + e.amount, 0);
-  const totalPaid = state.entries.filter((e) => e.kind === 'payment').reduce((t, e) => t + e.amount, 0);
-  const balances = state.customers.map((c) => ({ c, bal: balanceOf(state, c.id) }));
+  const getCustomerBalance = useCallback((cId) => {
+    const cEntries = entries.filter((e) => e.customerId === cId);
+    return cEntries.reduce((t, e) => t + (e.kind === 'debt' ? (Number(e.amount) || 0) : -(Number(e.amount) || 0)), 0);
+  }, [entries]);
+
+  const balances = customers.map((c) => ({ c, bal: getCustomerBalance(c.id) }));
   const statOutstanding = balances.reduce((t, b) => t + Math.max(b.bal, 0), 0);
   const statOpen = balances.filter((b) => b.bal > 0).length;
 
-  const q = query.trim().toLowerCase();
+  const q = searchQuery.trim().toLowerCase();
   const filteredList = balances
-    .filter(({ c }) => !q || c.name.toLowerCase().includes(q) || c.mobile.includes(q))
-    .sort((a, b) => b.bal - a.bal || a.c.name.localeCompare(b.c.name));
+    .filter(({ c }) => !q || (c.name || '').toLowerCase().includes(q) || (c.mobile || '').includes(q))
+    .sort((a, b) => b.bal - a.bal || (a.c.name || '').localeCompare(b.c.name || ''));
 
-  const customer = state.customers.find((c) => c.id === selectedId) || null;
+  const currentCustomer = customers.find((c) => c.id === selectedId) || null;
 
-  /* ── customer CRUD ── */
-  function registerCustomer(e) {
+  /* ── Customer CRUD ── */
+  async function registerCustomer(e) {
     e.preventDefault();
     const name = custName.trim();
     const mobile = custMobile.trim();
-    if (!name || !mobile) return;
-    const c = { id: uid(), name, mobile, createdAt: new Date().toISOString() };
-    const newState = { ...state, customers: [...state.customers, c] };
-    persist(newState);
-    setSelectedId(c.id);
-    setCustName('');
-    setCustMobile('');
+    if (!name || !mobile || isSubmittingCust) return;
+
+    try {
+      setIsSubmittingCust(true);
+      const docRef = await addDoc(collection(db, 'debtors_customers'), {
+        name,
+        mobile,
+        createdAt: new Date().toISOString()
+      });
+      setSelectedId(docRef.id);
+      setCustName('');
+      setCustMobile('');
+    } catch (err) {
+      alert('Error registering customer: ' + err.message);
+    } finally {
+      setIsSubmittingCust(false);
+    }
   }
 
-  function deleteCustomer() {
-    if (!selectedId) return;
-    if (!confirm('Delete this customer and all their entries?')) return;
-    persist({
-      entries: state.entries.filter((e) => e.customerId !== selectedId),
-      customers: state.customers.filter((c) => c.id !== selectedId),
-    });
-    setSelectedId(null);
+  async function deleteCustomer() {
+    if (!selectedId || !currentCustomer) return;
+    if (!confirm(`Delete "${currentCustomer.name}" and all their debt/payment entries?`)) return;
+
+    try {
+      const cId = selectedId;
+      setSelectedId(null);
+
+      // Delete customer document
+      await deleteDoc(doc(db, 'debtors_customers', cId));
+
+      // Batch delete related entries
+      const entriesQuery = query(collection(db, 'debtors_entries'), where('customerId', '==', cId));
+      const snap = await getDocs(entriesQuery);
+      const batch = writeBatch(db);
+      snap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    } catch (err) {
+      alert('Error deleting customer: ' + err.message);
+    }
   }
 
-  /* ── debt / payment ── */
-  function addDebt(e) {
+  /* ── Debt / Payment Actions ── */
+  async function addDebt(e) {
     e.preventDefault();
-    if (!selectedId) return;
-    persist({
-      ...state,
-      entries: [...state.entries, {
-        id: uid(), customerId: selectedId, kind: 'debt',
-        product: debtProduct.trim(),
+    if (!selectedId || isSubmittingDebt) return;
+    const amt = Number(debtAmount);
+    if (!amt || amt <= 0) return alert('Please enter a valid amount');
+
+    try {
+      setIsSubmittingDebt(true);
+      await addDoc(collection(db, 'debtors_entries'), {
+        customerId: selectedId,
+        kind: 'debt',
+        product: debtProduct.trim() || 'Purchase',
         quantity: debtQty ? Number(debtQty) : null,
-        amount: Number(debtAmount),
+        amount: amt,
         note: debtNote.trim() || null,
         date: debtDate || today(),
-      }],
-    });
-    setDebtProduct(''); setDebtQty(''); setDebtAmount(''); setDebtNote('');
-    setDebtDate(today());
+        timestamp: new Date().toISOString()
+      });
+      setDebtProduct('');
+      setDebtQty('');
+      setDebtAmount('');
+      setDebtNote('');
+      setDebtDate(today());
+    } catch (err) {
+      alert('Error adding debt: ' + err.message);
+    } finally {
+      setIsSubmittingDebt(false);
+    }
   }
 
-  function addPayment(e) {
+  async function addPayment(e) {
     e.preventDefault();
-    if (!selectedId) return;
-    persist({
-      ...state,
-      entries: [...state.entries, {
-        id: uid(), customerId: selectedId, kind: 'payment',
-        product: null, quantity: null,
-        amount: Number(payAmount),
+    if (!selectedId || isSubmittingPay) return;
+    const amt = Number(payAmount);
+    if (!amt || amt <= 0) return alert('Please enter a valid amount');
+
+    try {
+      setIsSubmittingPay(true);
+      await addDoc(collection(db, 'debtors_entries'), {
+        customerId: selectedId,
+        kind: 'payment',
+        product: null,
+        quantity: null,
+        amount: amt,
         note: payNote.trim() || null,
         date: payDate || today(),
-      }],
-    });
-    setPayAmount(''); setPayNote('');
-    setPayDate(today());
-  }
-
-  function deleteEntry(entryId) {
-    persist({ ...state, entries: state.entries.filter((x) => x.id !== entryId) });
-  }
-
-  /* ── backup ── */
-  function exportBackup() {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'skm-debtors-backup.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
-
-  async function importBackup(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const data = JSON.parse(await file.text());
-      persist({ customers: data.customers || [], entries: data.entries || [] });
-      setSelectedId(null);
-    } catch {
-      alert('That file could not be read.');
+        timestamp: new Date().toISOString()
+      });
+      setPayAmount('');
+      setPayNote('');
+      setPayDate(today());
+    } catch (err) {
+      alert('Error recording payment: ' + err.message);
+    } finally {
+      setIsSubmittingPay(false);
     }
-    e.target.value = '';
   }
 
-  /* ── ledger rows ── */
-  const ledgerRows = customer ? entriesOf(state, customer.id) : [];
-  const customerBalance = customer ? balanceOf(state, customer.id) : 0;
+  async function deleteEntry(entryId) {
+    try {
+      await deleteDoc(doc(db, 'debtors_entries', entryId));
+    } catch (err) {
+      alert('Error deleting entry: ' + err.message);
+    }
+  }
+
+  /* ── Ledger calculations ── */
+  const ledgerRows = currentCustomer ? getCustomerEntries(currentCustomer.id) : [];
+  const customerBalance = currentCustomer ? getCustomerBalance(currentCustomer.id) : 0;
 
   let running = 0;
   const ledgerWithRunning = ledgerRows.map((e) => {
-    running += e.kind === 'debt' ? e.amount : -e.amount;
+    running += e.kind === 'debt' ? (Number(e.amount) || 0) : -(Number(e.amount) || 0);
     return { ...e, running };
   });
 
-  /* ─────────────────── JSX ─────────────────── */
   return (
     <div style={{ minHeight: '100vh', color: '#3a2415', fontFamily: 'Figtree, system-ui, sans-serif', background: 'linear-gradient(135deg,#fbe9cf,#f6d3b4 45%,#f2b9ac)', overflowX: 'hidden' }}>
 
@@ -196,17 +245,23 @@ export default function DebtorsApp() {
       {/* Topbar */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '20px clamp(16px,4vw,40px)', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 44, height: 44, display: 'grid', placeItems: 'center', borderRadius: 14, color: '#fff', fontSize: 22, fontFamily: 'Georgia, serif', background: 'linear-gradient(135deg,#c2410c,#e8b04b)', boxShadow: '0 10px 24px rgba(194,65,12,.3)' }}>S</div>
+          <div style={{
+            width: 44, height: 44, borderRadius: 14, overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'linear-gradient(135deg,#c2410c,#e8b04b)',
+            boxShadow: '0 10px 24px rgba(194,65,12,.3)', flexShrink: 0
+          }}>
+            <Image src="/skm-logo.png" alt="SKM Stores" width={44} height={44} style={{ objectFit: 'cover' }} />
+          </div>
           <div>
             <p style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 24, lineHeight: 1 }}>SKM Stores</p>
-            <p style={{ margin: '2px 0 0', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a6a4f' }}>Debtors book</p>
+            <p style={{ margin: '2px 0 0', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a6a4f' }}>
+              Debtors Book {loading ? '• Loading...' : '• Synced Live'}
+            </p>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <Link href="/" style={topbarBtn}>← Home</Link>
-          <button onClick={exportBackup} style={topbarBtn}>Export backup</button>
-          <label style={{ ...topbarBtn, cursor: 'pointer' }} htmlFor="importFileDebtors">Import backup</label>
-          <input id="importFileDebtors" type="file" accept="application/json" hidden ref={fileRef} onChange={importBackup} />
         </div>
       </header>
 
@@ -234,14 +289,18 @@ export default function DebtorsApp() {
           <section style={cardStyle}>
             <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>Customers</h2>
             <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <input className="" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer name" required style={fieldStyle} />
+              <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Customer name" required style={fieldStyle} />
               <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder="Mobile number" inputMode="tel" pattern="[0-9 +\-]{6,15}" required style={fieldStyle} />
-              <button type="submit" style={brandBtn}>Register customer</button>
+              <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
+                {isSubmittingCust ? 'Registering...' : 'Register customer'}
+              </button>
             </form>
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name or mobile" style={{ ...fieldStyle, margin: '14px 0 10px', width: '100%' }} />
+            <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search name or mobile" style={{ ...fieldStyle, margin: '14px 0 10px', width: '100%' }} />
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
               {filteredList.length === 0 ? (
-                <li style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>No customers yet. Register one above.</li>
+                <li style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>
+                  {loading ? 'Loading customers...' : 'No customers found.'}
+                </li>
               ) : filteredList.map(({ c, bal }) => (
                 <li key={c.id}>
                   <button
@@ -255,7 +314,9 @@ export default function DebtorsApp() {
                     }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ width: 34, height: 34, borderRadius: 11, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13, background: 'rgba(224,163,37,.28)' }}>{initials(c.name)}</span>
+                      <span style={{ width: 34, height: 34, borderRadius: 11, display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13, background: 'rgba(224,163,37,.28)' }}>
+                        {initials(c.name)}
+                      </span>
                       <span>
                         <strong style={{ display: 'block' }}>{escapeHtml(c.name)}</strong>
                         <small style={{ display: 'block', color: '#8a6a4f' }}>{escapeHtml(c.mobile)}</small>
@@ -272,24 +333,26 @@ export default function DebtorsApp() {
 
           {/* Right: detail */}
           <section style={cardStyle}>
-            {!customer ? (
+            {!currentCustomer ? (
               <p style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>Select a customer to see their ledger.</p>
             ) : (
               <>
                 {/* Detail head */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div>
-                    <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>{customer.name}</h2>
-                    <p style={{ color: '#8a6a4f', margin: '2px 0 0', fontSize: 14 }}>{customer.mobile}</p>
+                    <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>{currentCustomer.name}</h2>
+                    <p style={{ color: '#8a6a4f', margin: '2px 0 0', fontSize: 14 }}>{currentCustomer.mobile}</p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Balance due</p>
-                    <p style={{ margin: '6px 0 0', fontFamily: 'Georgia, serif', fontSize: 28 }}>{money(customerBalance)}</p>
+                    <p style={{ margin: '6px 0 0', fontFamily: 'Georgia, serif', fontSize: 28, color: customerBalance > 0 ? '#A8321C' : '#3f7d3f' }}>
+                      {money(customerBalance)}
+                    </p>
                   </div>
                 </div>
 
                 {/* Forms */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 18 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginTop: 18 }}>
                   {/* Debt form */}
                   <form onSubmit={addDebt} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                     <p style={{ margin: 0, fontWeight: 700 }}>Add debt / purchase</p>
@@ -300,7 +363,9 @@ export default function DebtorsApp() {
                     </div>
                     <input value={debtDate} onChange={(e) => setDebtDate(e.target.value)} type="date" required style={fieldStyle} />
                     <input value={debtNote} onChange={(e) => setDebtNote(e.target.value)} placeholder="Note (optional)" style={fieldStyle} />
-                    <button type="submit" style={brandBtn}>Add debt</button>
+                    <button type="submit" disabled={isSubmittingDebt} style={{ ...brandBtn, opacity: isSubmittingDebt ? 0.7 : 1 }}>
+                      {isSubmittingDebt ? 'Adding...' : 'Add debt'}
+                    </button>
                   </form>
 
                   {/* Payment form */}
@@ -309,7 +374,9 @@ export default function DebtorsApp() {
                     <input value={payAmount} onChange={(e) => setPayAmount(e.target.value)} type="number" min="0.01" step="0.01" placeholder="Amount ₹" required style={fieldStyle} />
                     <input value={payDate} onChange={(e) => setPayDate(e.target.value)} type="date" required style={fieldStyle} />
                     <input value={payNote} onChange={(e) => setPayNote(e.target.value)} placeholder="Note (optional)" style={fieldStyle} />
-                    <button type="submit" style={softStrongBtn}>Record payment</button>
+                    <button type="submit" disabled={isSubmittingPay} style={{ ...softStrongBtn, opacity: isSubmittingPay ? 0.7 : 1 }}>
+                      {isSubmittingPay ? 'Recording...' : 'Record payment'}
+                    </button>
                   </form>
                 </div>
 
@@ -337,7 +404,7 @@ export default function DebtorsApp() {
                             <td style={{ ...ledgerTd, maxWidth: 200 }}>{details}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'debt' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'payment' ? money(e.amount) : '—'}</td>
-                            <td style={{ ...ledgerTd, textAlign: 'right' }}>{money(e.running)}</td>
+                            <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>{money(e.running)}</td>
                             <td style={ledgerTd}>
                               <button type="button" onClick={() => deleteEntry(e.id)} style={{ background: 'transparent', border: 'none', color: '#a8321c', padding: '2px 6px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>✕</button>
                             </td>
@@ -361,8 +428,8 @@ export default function DebtorsApp() {
 }
 
 /* ── inline styles ── */
-const cardStyle = { background: 'rgba(255,251,244,.78)', border: '1px solid rgba(122,84,48,.18)', borderRadius: 20, padding: 20, backdropFilter: 'blur(12px)', boxShadow: '0 18px 40px rgba(122,84,48,.12)' };
-const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.7)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
+const cardStyle = { background: 'rgba(255,251,244,.85)', border: '1px solid rgba(122,84,48,.18)', borderRadius: 20, padding: 20, backdropFilter: 'blur(12px)', boxShadow: '0 18px 40px rgba(122,84,48,.12)' };
+const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)' };
 const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };

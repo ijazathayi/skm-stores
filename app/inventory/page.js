@@ -44,16 +44,66 @@ export default function InventoryPage() {
   // ── edit product ──
   const openEdit = (p) => {
     setEditItem(p);
-    setForm({ name: p.name || '', altName: p.altName || '', price: p.price ? String(p.price) : '', unit: p.unit || 'both', category: p.category || 'auto', productId: p.productId || '' });
+    // Resolve the actual current category — never show 'auto' in the dropdown
+    const resolvedCat = getProductCategory(p); // always returns a real category id
+    setForm({
+      name:      p.name     || '',
+      altName:   p.altName  || '',
+      price:     p.price    ? String(p.price) : '',
+      unit:      p.unit     || 'both',
+      category:  resolvedCat,
+      productId: p.productId || '',
+    });
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) { alert('Name required'); return; }
-    const updates = { name: form.name.trim(), altName: (form.altName || form.name).trim(), unit: form.unit };
-    if (form.category && form.category !== 'auto') updates.category = form.category;
-    if (form.price && !isNaN(form.price) && Number(form.price) > 0) updates.price = Number(form.price);
-    if (form.productId) updates.productId = form.productId.trim().toUpperCase();
-    await updateInventoryItem(editItem.id, updates);
+
+    const oldCatId = getProductCategory(editItem);
+    const newCatId = form.category && form.category !== 'auto' ? form.category : oldCatId;
+    const categoryChanged = newCatId !== oldCatId;
+
+    if (categoryChanged) {
+      // ── Category changed → delete old doc, create new one with new productId ──
+      // Generate next available ID in the new category
+      const allIds = inventory
+        .filter((p) => p.id !== editItem.id) // exclude the current item
+        .map((p) => p.productId)
+        .filter(Boolean);
+      const newProductId = generateProductId(newCatId, allIds);
+
+      const newData = {
+        productId:  newProductId,
+        name:       form.name.trim(),
+        altName:    (form.altName || form.name).trim(),
+        unit:       form.unit,
+        category:   newCatId,
+      };
+      if (form.price && !isNaN(form.price) && Number(form.price) > 0) {
+        newData.price = Number(form.price);
+      }
+
+      // Create new doc first, then delete old
+      await setDoc(doc(db, 'inventory', newProductId), newData);
+      await deleteInventoryItem(editItem.id);
+    } else {
+      // ── Same category → just update the existing doc ──
+      const updates = {
+        name:     form.name.trim(),
+        altName:  (form.altName || form.name).trim(),
+        unit:     form.unit,
+        category: newCatId,
+      };
+      if (form.price && !isNaN(form.price) && Number(form.price) > 0) {
+        updates.price = Number(form.price);
+      }
+      // Allow manual productId override only when category hasn't changed
+      if (form.productId && form.productId.trim().toUpperCase() !== editItem.productId) {
+        updates.productId = form.productId.trim().toUpperCase();
+      }
+      await updateInventoryItem(editItem.id, updates);
+    }
+
     setEditItem(null);
   };
 
@@ -386,13 +436,41 @@ export default function InventoryPage() {
               <div className="modal-field">
                 <label>Category</label>
                 <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  {CAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  {STORE_CATEGORIES.map((c) => (
+                    <option key={c.id} value={c.id}>{c.icon} {c.label}</option>
+                  ))}
                 </select>
+                {/* Show current product ID + preview of new ID if category changes */}
+                {(() => {
+                  const oldCat = getProductCategory(editItem);
+                  const newCat = form.category && form.category !== 'auto' ? form.category : oldCat;
+                  const changing = newCat !== oldCat;
+                  const allIds = inventory
+                    .filter((p) => p.id !== editItem?.id)
+                    .map((p) => p.productId).filter(Boolean);
+                  const previewId = changing ? generateProductId(newCat, allIds) : null;
+                  return (
+                    <div style={{ marginTop: 6, fontSize: 12, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                      <span style={{ color: 'var(--ink3)' }}>
+                        Current ID: <b style={{ fontFamily: 'monospace' }}>#{editItem?.productId || '—'}</b>
+                      </span>
+                      {changing && previewId && (
+                        <span style={{ color: 'var(--primary-dark)', fontWeight: 700 }}>
+                          → New ID: <span style={{ fontFamily: 'monospace' }}>#{previewId}</span>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn-cancel" onClick={() => setEditItem(null)}>Cancel</button>
-              <button className="btn-save"   onClick={handleSave}>Save changes</button>
+              <button className="btn-save"   onClick={handleSave}>
+                {editItem && getProductCategory(editItem) !== (form.category && form.category !== 'auto' ? form.category : getProductCategory(editItem))
+                  ? '🔄 Change Category & Save'
+                  : 'Save changes'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Golden Grove — Grocery Shop Debt Book</title>
+<meta name="description" content="Track grocery shop customer debts, purchases and repayments with per-customer ledgers and shop totals." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="glow glow-a"></div>
+<div class="glow glow-b"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">G</div>
+    <div>
+      <p class="brand-name">Golden Grove</p>
+      <p class="brand-sub">Shop debt book</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button class="btn-soft" id="exportBtn" type="button">Export backup</button>
+    <label class="btn-soft" for="importFile">Import backup</label>
+    <input id="importFile" type="file" accept="application/json" hidden />
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="stats">
+    <div class="card stat"><p class="stat-label">Total outstanding</p><p class="stat-value" id="statOutstanding">₹0</p></div>
+    <div class="card stat"><p class="stat-label">Open accounts</p><p class="stat-value" id="statOpen">0</p></div>
+    <div class="card stat"><p class="stat-label">Credit given</p><p class="stat-value" id="statDebt">₹0</p></div>
+    <div class="card stat"><p class="stat-label">Repayments</p><p class="stat-value" id="statPaid">₹0</p></div>
+  </section>
+
+  <div class="layout">
+    <section class="card">
+      <h2 class="h2">Customers</h2>
+      <form class="stack" id="customerForm">
+        <input class="field" id="custName" placeholder="Customer name" required />
+        <input class="field" id="custMobile" placeholder="Mobile number" inputmode="tel" pattern="[0-9 +\-]{6,15}" required />
+        <button class="btn-brand" type="submit">Register customer</button>
+      </form>
+      <input class="field search" id="search" placeholder="Search name or mobile" />
+      <ul class="customer-list" id="customerList"></ul>
+    </section>
+
+    <section class="card" id="detail">
+      <p class="empty" id="emptyDetail">Select a customer to see their ledger.</p>
+      <div id="detailBody" hidden>
+        <div class="detail-head">
+          <div>
+            <h2 class="h2" id="detailName">—</h2>
+            <p class="muted" id="detailMobile">—</p>
+          </div>
+          <div class="balance">
+            <p class="stat-label">Balance due</p>
+            <p class="stat-value" id="detailBalance">₹0</p>
+          </div>
+        </div>
+
+        <div class="forms">
+          <form class="stack" id="debtForm">
+            <p class="form-title">Add debt / purchase</p>
+            <input class="field" id="debtProduct" placeholder="Product (e.g. Rice 5kg)" required />
+            <div class="row">
+              <input class="field" id="debtQty" type="number" min="0" step="0.01" placeholder="Qty" />
+              <input class="field" id="debtAmount" type="number" min="0.01" step="0.01" placeholder="Amount ₹" required />
+            </div>
+            <input class="field" id="debtDate" type="date" required />
+            <input class="field" id="debtNote" placeholder="Note (optional)" />
+            <button class="btn-brand" type="submit">Add debt</button>
+          </form>
+
+          <form class="stack" id="payForm">
+            <p class="form-title">Record repayment</p>
+            <input class="field" id="payAmount" type="number" min="0.01" step="0.01" placeholder="Amount ₹" required />
+            <input class="field" id="payDate" type="date" required />
+            <input class="field" id="payNote" placeholder="Note (optional)" />
+            <button class="btn-soft strong" type="submit">Record payment</button>
+          </form>
+        </div>
+
+        <h3 class="h3">Ledger</h3>
+        <div class="table-wrap">
+          <table class="ledger">
+            <thead><tr><th>Date</th><th>Details</th><th class="num">Debt</th><th class="num">Paid</th><th class="num">Running</th><th></th></tr></thead>
+            <tbody id="ledgerBody"></tbody>
+          </table>
+        </div>
+        <button class="btn-danger" id="deleteCustomer" type="button">Delete customer</button>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

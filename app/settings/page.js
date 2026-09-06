@@ -28,38 +28,72 @@ export default function SettingsPage() {
   // Seed form from Firestore store profile whenever it loads/changes
   useEffect(() => {
     if (storeProfile) {
-      setStoreName(storeProfile.storeName     || 'SKM STORES');
-      setStorePhone(storeProfile.storePhone   || '');
-      setStoreAddress(storeProfile.storeAddress || '');
-      setReceiptFooter(storeProfile.receiptFooter || 'THANK YOU VISIT AGAIN');
+      if (storeProfile.storeName) setStoreName(storeProfile.storeName);
+      if (storeProfile.storePhone !== undefined) setStorePhone(storeProfile.storePhone);
+      if (storeProfile.storeAddress !== undefined) setStoreAddress(storeProfile.storeAddress);
+      if (storeProfile.receiptFooter) setReceiptFooter(storeProfile.receiptFooter);
+      if (storeProfile.printLang) {
+        setPrintLang(storeProfile.printLang);
+        if (typeof window !== 'undefined') localStorage.setItem('skm_printLang', storeProfile.printLang);
+      }
+      if (storeProfile.printWidth) {
+        setPrintWidth(Number(storeProfile.printWidth));
+        if (typeof window !== 'undefined') localStorage.setItem('skm_printWidth', storeProfile.printWidth);
+      }
     }
   }, [storeProfile]);
 
-  // Seed print settings from localStorage (device-specific)
+  // Seed print settings from localStorage fallback
   useEffect(() => {
-    setPrintWidth(Number(LS('skm_printWidth', '58')) || 58);
-    setPrintLang(LS('skm_printLang', 'en'));
+    const savedWidth = Number(LS('skm_printWidth', '58')) || 58;
+    const savedLang = LS('skm_printLang', 'en');
+    setPrintWidth(savedWidth);
+    setPrintLang(savedLang);
   }, []);
 
-  const flash = (msg) => { setSaved(msg); setTimeout(() => setSaved(''), 2500); };
+  const flash = (msg) => { setSaved(msg); setTimeout(() => setSaved(''), 3000); };
 
   /* ── Save store profile to Firestore ── */
   const saveStore = async () => {
     try {
-      await updateStoreProfile({ storeName, storePhone, storeAddress, receiptFooter });
-      flash('✓ Saved to cloud!');
+      await updateStoreProfile({
+        storeName: storeName.trim() || 'SKM STORES',
+        storePhone: storePhone.trim(),
+        storeAddress: storeAddress.trim(),
+        receiptFooter: receiptFooter.trim() || 'THANK YOU VISIT AGAIN',
+        printWidth,
+        printLang
+      });
+      flash('✓ Store profile saved to cloud!');
     } catch (err) {
       flash('❌ Save failed: ' + err.message);
     }
   };
 
   /* ── Print width ── */
-  const savePrintWidth = (w) => {
+  const savePrintWidth = async (w) => {
     const v = Number(w);
     if (!v || v < 40 || v > 120) { alert('Enter 40–120 mm'); return; }
     setPrintWidth(v);
-    localStorage.setItem('skm_printWidth', v);
-    flash('✓ Width saved!');
+    if (typeof window !== 'undefined') localStorage.setItem('skm_printWidth', v);
+    try {
+      await updateStoreProfile({ printWidth: v });
+      flash('✓ Paper width saved (' + v + ' mm)!');
+    } catch (err) {
+      flash('✓ Width saved locally');
+    }
+  };
+
+  /* ── Print Language ── */
+  const changePrintLang = async (l) => {
+    setPrintLang(l);
+    if (typeof window !== 'undefined') localStorage.setItem('skm_printLang', l);
+    try {
+      await updateStoreProfile({ printLang: l });
+      flash(`✓ Language set to ${l === 'ta' ? 'தமிழ் (Tamil)' : 'English'}!`);
+    } catch (err) {
+      flash('✓ Language saved locally');
+    }
   };
 
   /* ── Admin password (localStorage only) ── */
@@ -144,7 +178,7 @@ export default function SettingsPage() {
             <label>Receipt Language</label>
             <div style={{ display: 'inline-flex', border: '1px solid var(--border)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
               {[['en', 'English'], ['ta', 'தமிழ்']].map(([l, name]) => (
-                <button key={l} onClick={() => { setPrintLang(l); localStorage.setItem('skm_printLang', l); }} style={{
+                <button key={l} onClick={() => changePrintLang(l)} style={{
                   border: 'none', padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
                   background: printLang === l ? 'var(--primary)' : 'transparent',
                   color: printLang === l ? '#fff' : 'var(--ink3)',

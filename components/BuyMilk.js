@@ -40,10 +40,11 @@ const CSS = `
   flex-direction: column;
   align-items: center;
   background: #ffffff;
-  width: min(60%, 680px);
+  width: 100%;
+  max-width: 680px;
   margin-bottom: 20px;
   box-shadow: 0 2px 12px rgba(0,0,0,0.10);
-  border-radius: 6px;
+  border-radius: 12px;
   overflow: hidden;
 }
 

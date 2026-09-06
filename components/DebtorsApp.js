@@ -283,7 +283,7 @@ export default function DebtorsApp() {
         </section>
 
         {/* Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(280px,360px) 1fr', gap: 18, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
 
           {/* Left: customer list */}
           <section style={cardStyle}>

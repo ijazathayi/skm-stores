@@ -24,6 +24,9 @@ const initials = (name) =>
 function escapeHtml(s) {
   return String(s == null ? '' : s);
 }
+function mobileLabel(mobile) {
+  return String(mobile || '').trim() || 'Mobile number not registered';
+}
 
 export default function DebtorsApp() {
   const { lang } = useStore();
@@ -120,7 +123,7 @@ export default function DebtorsApp() {
     e.preventDefault();
     const name = custName.trim();
     const mobile = custMobile.trim();
-    if (!name || !mobile || isSubmittingCust) return;
+    if (!name || isSubmittingCust) return;
 
     try {
       setIsSubmittingCust(true);
@@ -314,7 +317,7 @@ export default function DebtorsApp() {
             </h2>
             <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
-              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண்' : 'Mobile number'} inputMode="tel" pattern="[0-9 +\-]{6,15}" required style={fieldStyle} />
+              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண்' : 'Mobile number'} inputMode="tel" pattern="[0-9 +\-]{6,15}" style={fieldStyle} />
               <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
                 {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Register customer')}
               </button>
@@ -343,7 +346,7 @@ export default function DebtorsApp() {
                       </span>
                       <span>
                         <strong style={{ display: 'block' }}>{escapeHtml(c.name)}</strong>
-                        <small style={{ display: 'block', color: '#8a6a4f' }}>{escapeHtml(c.mobile)}</small>
+                        <small style={{ display: 'block', color: '#8a6a4f' }}>{mobileLabel(c.mobile)}</small>
                       </span>
                     </span>
                     <span style={{ fontFamily: 'Georgia, serif', fontSize: 17, color: bal > 0 ? '#3a2415' : '#3f7d3f' }}>
@@ -365,7 +368,7 @@ export default function DebtorsApp() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div>
                     <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>{currentCustomer.name}</h2>
-                    <p style={{ color: '#8a6a4f', margin: '2px 0 0', fontSize: 14 }}>{currentCustomer.mobile}</p>
+                    <p style={{ color: '#8a6a4f', margin: '2px 0 0', fontSize: 14 }}>{mobileLabel(currentCustomer.mobile)}</p>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Balance due</p>

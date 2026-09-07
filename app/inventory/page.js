@@ -148,16 +148,7 @@ export default function InventoryPage() {
 
       // Update existing items
       for (const item of toUpdate) {
-        const updates = {
-          name: item.name,
-          altName: item.altName,
-          unit: item.unit,
-          category: item.category,
-        };
-        if (item.price != null && !isNaN(item.price)) {
-          updates.price = Number(item.price);
-        }
-        await updateInventoryItem(item.existingId, updates);
+        await updateInventoryItem(item.firestoreId, item.updates);
       }
 
       // Add new items
@@ -235,6 +226,24 @@ export default function InventoryPage() {
           }}>
             {importMsg}
           </div>
+        )}
+
+        {importPreview && (
+          <section style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+            background: '#F1F0E4', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
+              <strong style={{ color: 'var(--ink)' }}>{isTa ? 'இறக்குமதிக்கு தயாராக உள்ளது' : 'Ready to import'}</strong>
+              <span>{isTa
+                ? `: ${importPreview.toAdd.length} புதியவை, ${importPreview.toUpdate.length} புதுப்பிப்புகள், ${importPreview.skipped} தவிர்க்கப்பட்டவை`
+                : `: ${importPreview.toAdd.length} new, ${importPreview.toUpdate.length} updates, ${importPreview.skipped} skipped`}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-cancel" onClick={cancelImport}>{isTa ? 'ரத்து' : 'Cancel'}</button>
+              <button className="btn-save" onClick={confirmImport}>{isTa ? 'சேமித்து இறக்குமதி செய்' : 'Save and import'}</button>
+            </div>
+          </section>
         )}
 
         {/* ── Search ── */}

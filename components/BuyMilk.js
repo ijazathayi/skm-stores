@@ -222,8 +222,6 @@ export default function BuyMilk() {
     const html2canvas = window.html2canvas;
     if (!html2canvas) throw new Error('html2canvas not loaded');
 
-    const originalWrapper = document.getElementById('bm-bill-wrapper');
-    const originalTable   = document.getElementById('bm-myTable');
     const billWrapper = document.getElementById('bm-bill-wrapper');
     if (!billWrapper) throw new Error('Bill wrapper not found');
 
@@ -245,6 +243,21 @@ export default function BuyMilk() {
       span.style.textAlign = 'center';
       cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
     });
+
+    // Keep the app table complete, but create a concise customer-facing image.
+    tableClone.querySelector('[data-milk-export-columns]')?.deleteCell(1);
+    tableClone.querySelectorAll('[data-milk-export-section]').forEach((header) => {
+      header.colSpan = 4;
+    });
+    tableClone.querySelectorAll('[data-milk-export-item]').forEach((row) => {
+      if (Number(row.dataset.total) === 0) {
+        row.remove();
+      } else {
+        row.deleteCell(1);
+      }
+    });
+    const grandTotalRow = tableClone.querySelector('[data-milk-export-grand-total]');
+    if (grandTotalRow) grandTotalRow.cells[0].colSpan = 2;
 
     const h2c = typeof window !== 'undefined' ? window.html2canvas : null;
     if (!h2c) throw new Error('html2canvas not loaded');
@@ -334,7 +347,7 @@ export default function BuyMilk() {
             <table id="bm-myTable">
               <tbody>
                 {/* column headers */}
-                <tr>
+                <tr data-milk-export-columns>
                   <th>{isTa ? 'பாக்கெட்டுகள்' : 'Packets'}</th>
                   <th>{isTa ? 'மொத்த விலை (WP)' : 'Wholesale Price'}</th>
                   <th>{isTa ? 'விற்பனை விலை (SP)' : 'Price'}</th>
@@ -344,9 +357,9 @@ export default function BuyMilk() {
 
                 {Object.entries(sections).map(([section, items]) => (
                   <tr key={`wrap-${section}`} style={{ display: 'contents' }}>
-                    <th colSpan="5" style={{ background: '#0056b3', color: '#fff' }}>{getSectionTitle(section)}</th>
+                    <th data-milk-export-section colSpan="5" style={{ background: '#0056b3', color: '#fff' }}>{getSectionTitle(section)}</th>
                     {items.map((item) => (
-                      <tr key={item.key}>
+                      <tr key={item.key} data-milk-export-item data-total={totals[item.key] || 0}>
                         <td>{getItemLabel(item)}</td>
                         <td>₹{Number(item.wp).toFixed(2)}</td>
                         <td>₹{Number(item.sp).toFixed(2)}</td>
@@ -367,7 +380,7 @@ export default function BuyMilk() {
                 ))}
 
                 {/* Grand total */}
-                <tr style={{ background: '#f0f0f0', fontWeight: 'bold' }}>
+                <tr data-milk-export-grand-total style={{ background: '#f0f0f0', fontWeight: 'bold' }}>
                   <td colSpan="3">{isTa ? 'மொத்த தொகை (Grand Total)' : 'Grand Total'}</td>
                   <td>{grandPieces}</td>
                   <td>₹{grandTotal.toFixed(2)}</td>

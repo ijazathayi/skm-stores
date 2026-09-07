@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, generateProductId } from '@/lib/helpers';
 import { exportInventory, parseImportFile } from '@/lib/inventoryExcel';
 import { getProductName } from '@/lib/translations';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function InventoryPage() {
@@ -144,29 +144,32 @@ export default function InventoryPage() {
     setImportMsg(isTa ? 'பொருட்கள் சேமிக்கப்படுகிறது…' : 'Saving products…');
 
     try {
-      const { toUpdate, toAdd } = importPreview;
+      const operations = [
+        ...importPreview.toUpdate.map((item) => ({
+          type: 'update', ref: doc(db, 'inventory', item.firestoreId), data: item.updates,
+        })),
+        ...importPreview.toAdd.map((item) => ({
+          type: 'set', ref: doc(db, 'inventory', item.productId), data: item,
+        })),
+      ];
+      const batchSize = 500;
+      const batchCount = Math.ceil(operations.length / batchSize);
 
-      // Update existing items
-      for (const item of toUpdate) {
-        await updateInventoryItem(item.firestoreId, item.updates);
+      for (let start = 0; start < operations.length; start += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = operations.slice(start, start + batchSize);
+        chunk.forEach((operation) => {
+          if (operation.type === 'update') batch.update(operation.ref, operation.data);
+          else batch.set(operation.ref, operation.data);
+        });
+        const currentBatch = start / batchSize + 1;
+        setImportMsg(isTa
+          ? `பொருட்கள் சேமிக்கப்படுகிறது… (${currentBatch}/${batchCount})`
+          : `Saving products… (${currentBatch}/${batchCount})`);
+        await batch.commit();
       }
 
-      // Add new items
-      for (const item of toAdd) {
-        const data = {
-          productId: item.productId,
-          name: item.name,
-          altName: item.altName,
-          unit: item.unit,
-          category: item.category,
-        };
-        if (item.price != null && !isNaN(item.price)) {
-          data.price = Number(item.price);
-        }
-        await setDoc(doc(db, 'inventory', item.productId), data);
-      }
-
-      setImportMsg(isTa ? `✓ ${toUpdate.length + toAdd.length} பொருட்கள் வெற்றிகரமாக இறக்குமதி செய்யப்பட்டன!` : `✓ Successfully imported ${toUpdate.length + toAdd.length} products!`);
+      setImportMsg(isTa ? `✓ ${operations.length} பொருட்கள் வெற்றிகரமாக இறக்குமதி செய்யப்பட்டன!` : `✓ Successfully imported ${operations.length} products!`);
       setImportPreview(null);
       setTimeout(() => setImportMsg(''), 4000);
     } catch (err) {

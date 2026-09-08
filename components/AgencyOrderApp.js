@@ -25,6 +25,7 @@ const DAYS_TA = {
 const uid = () => Math.random().toString(36).slice(2, 10);
 const money = (n) => '₹' + (Number(n) || 0).toFixed(2);
 const esc = (s) => String(s == null ? '' : s);
+const phoneLink = (phone) => `tel:${String(phone || '').replace(/[^\d+]/g, '')}`;
 
 /* ── sub-components ── */
 function Toast({ message, visible }) {
@@ -524,6 +525,7 @@ export default function AgencyOrderApp() {
                   <div style={{ borderTop: '1px solid rgba(122,84,48,.18)', paddingTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button onClick={() => openOrder(a.id)} style={primarySmBtn}>Make list</button>
                     <button onClick={() => openProducts(a.id)} style={smBtn}>Products</button>
+                    {a.phone && <a href={phoneLink(a.phone)} style={{ ...smBtn, textDecoration: 'none' }} aria-label={`Call ${a.name}`}>Call</a>}
                     <button onClick={() => openAgency(a.id)} style={smBtn}>Edit</button>
                     <button onClick={() => deleteAgency(a.id)} style={dangerSmBtn}>Delete</button>
                   </div>

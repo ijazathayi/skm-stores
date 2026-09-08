@@ -98,6 +98,7 @@ export default function AgencyOrderApp() {
   const [pUnit, setPUnit] = useState('');
   const [pWhole, setPWhole] = useState('');
   const [pRetail, setPRetail] = useState('');
+  const [editingProductId, setEditingProductId] = useState(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   // Order modal
@@ -213,7 +214,24 @@ export default function AgencyOrderApp() {
     setPUnit('');
     setPWhole('');
     setPRetail('');
+    setEditingProductId(null);
     setProductModal(true);
+  }
+
+  function editProduct(product) {
+    setEditingProductId(product.id);
+    setPName(product.name || '');
+    setPUnit(product.unit || '');
+    setPWhole(String(product.wholesale ?? ''));
+    setPRetail(String(product.retail ?? ''));
+  }
+
+  function clearProductForm() {
+    setEditingProductId(null);
+    setPName('');
+    setPUnit('');
+    setPWhole('');
+    setPRetail('');
   }
 
   async function addProduct(e) {
@@ -224,8 +242,8 @@ export default function AgencyOrderApp() {
     const a = agency(productAgencyId);
     if (!a) return;
 
-    const newProd = {
-      id: uid(),
+    const product = {
+      id: editingProductId || uid(),
       name,
       unit: pUnit.trim() || 'pcs',
       wholesale: +pWhole || 0,
@@ -234,13 +252,14 @@ export default function AgencyOrderApp() {
 
     try {
       setIsSavingProduct(true);
-      const updatedProducts = [...(a.products || []), newProd];
+      const updatedProducts = editingProductId
+        ? (a.products || []).map((p) => p.id === editingProductId ? product : p)
+        : [...(a.products || []), product];
       await updateDoc(doc(db, 'agencies', productAgencyId), { products: updatedProducts });
-      setPName('');
-      setPUnit('');
-      setPWhole('');
-      setPRetail('');
-      showToast(isTa ? '✓ பொருள் சேர்க்கப்பட்டது' : '✓ Product added');
+      clearProductForm();
+      showToast(editingProductId
+        ? (isTa ? '✓ பொருள் புதுப்பிக்கப்பட்டது' : '✓ Product updated')
+        : (isTa ? '✓ பொருள் சேர்க்கப்பட்டது' : '✓ Product added'));
     } catch (err) {
       alert('Error adding product: ' + err.message);
     } finally {
@@ -251,12 +270,14 @@ export default function AgencyOrderApp() {
   async function deleteProduct(agencyId, prodId) {
     const a = agency(agencyId);
     if (!a) return;
+    if (!confirm(isTa ? 'இந்த பொருளை நீக்கவா?' : 'Remove this product?')) return;
     try {
       const updatedProducts = (a.products || []).filter((p) => p.id !== prodId);
       await updateDoc(doc(db, 'agencies', agencyId), { products: updatedProducts });
+      if (editingProductId === prodId) clearProductForm();
       showToast(isTa ? 'பொருள் நீக்கப்பட்டது' : 'Product removed');
     } catch (err) {
-      alert('Error deleting product: ' + err.message);
+      alert('Error removing product: ' + err.message);
     }
   }
 
@@ -581,8 +602,9 @@ export default function AgencyOrderApp() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label style={labelStyle}>&nbsp;</label>
               <button onClick={addProduct} disabled={isSavingProduct} style={{ ...brandBtn, padding: '11px 16px' }}>
-                {isSavingProduct ? 'Adding...' : 'Add product'}
+                {isSavingProduct ? 'Saving...' : editingProductId ? 'Save changes' : 'Add product'}
               </button>
+              {editingProductId && <button onClick={clearProductForm} style={topbarBtn}>Cancel</button>}
             </div>
           </div>
 
@@ -608,7 +630,10 @@ export default function AgencyOrderApp() {
                       {money((+p.retail || 0) - (+p.wholesale || 0))}
                     </td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <button onClick={() => removeProduct(productAgencyId, p.id)} style={dangerSmBtn}>Remove</button>
+                      <div style={{ display: 'inline-flex', gap: 6 }}>
+                        <button onClick={() => editProduct(p)} style={smBtn}>Edit</button>
+                        <button onClick={() => deleteProduct(productAgencyId, p.id)} style={dangerSmBtn}>Remove</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

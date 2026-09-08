@@ -16,6 +16,9 @@
 
 * { box-sizing: border-box; }
 
+/* Prevent an accidental pull-down from triggering the browser refresh gesture. */
+html, body { overscroll-behavior-y: none; }
+
 body {
   margin: 0;
   min-height: 100vh;

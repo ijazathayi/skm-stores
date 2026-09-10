@@ -33,3 +33,5 @@ PASSKEY_RP_ORIGIN=https://your-real-domain.example
 ```
 
 Create the service-account JSON in Google Cloud Console → IAM & Admin → Service Accounts for the `skm-billing-33a82` project. Its private key is required only by the server so it can verify a passkey and issue a Firebase sign-in token. `PASSKEY_RP_ID` and `PASSKEY_RP_ORIGIN` must exactly match the HTTPS address where the app is deployed. Passkeys work on HTTPS (or `localhost` while testing), not on an ordinary local-network HTTP address.
+
+The app must be hosted by a Next.js server platform (for example Vercel, Firebase App Hosting, or Cloud Run). A static-only host, including ordinary Firebase Hosting or GitHub Pages, cannot run the `/api/passkeys/*` verification routes and will show a "service is unavailable" message.

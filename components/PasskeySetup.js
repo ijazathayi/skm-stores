@@ -5,8 +5,17 @@ import { startRegistration } from '@simplewebauthn/browser';
 import { auth } from '@/lib/firebase';
 
 async function readResponse(response) {
-  const body = await response.json();
-  if (!response.ok) throw new Error(body.error || 'Something went wrong.');
+  const rawBody = await response.text();
+  let body = null;
+  try {
+    body = rawBody ? JSON.parse(rawBody) : null;
+  } catch {
+    // Some static hosting services return an empty or HTML response for API routes.
+  }
+  if (!response.ok || !body) {
+    if (body?.error) throw new Error(body.error);
+    throw new Error(`Fingerprint setup service is unavailable (server response ${response.status}). The app must be deployed with server routes enabled.`);
+  }
   return body;
 }
 

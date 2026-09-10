@@ -9,9 +9,7 @@ import { auth, db } from '@/lib/firebase';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [accountType, setAccountType] = useState('worker');
-  const [workerId, setWorkerId] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -23,21 +21,21 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const cleanWorkerId = workerId.trim().toLowerCase();
-      if (accountType === 'worker' && !/^[a-z0-9._-]{3,30}$/.test(cleanWorkerId)) {
-        setError('Enter a Worker ID using 3–30 letters, numbers, dots, dashes, or underscores.');
+      const cleanName = name.trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,30}$/.test(cleanName)) {
+        setError('Enter a name using 3–30 letters, numbers, dots, dashes, or underscores.');
         return;
       }
       // Firebase email/password authentication still needs an email internally.
-      // Workers only enter their ID; it maps to a private SKM account address.
-      const loginEmail = accountType === 'worker' ? `${cleanWorkerId}@skm.local` : email.trim();
+      // The app creates it from the name, so users only enter name and password.
+      const loginEmail = `${cleanName}@skm.local`;
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'users', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;
-      if (role !== accountType) {
+      if (role !== 'admin' && role !== 'worker') {
         await signOut(auth);
-        setError(role ? `This account is registered as ${role}, not ${accountType}.` : 'This account has no assigned role. Ask the administrator to set it up.');
+        setError('This account has no assigned role. Ask the administrator to set it up.');
         return;
       }
       router.replace(role === 'admin' ? '/admin' : '/');
@@ -59,30 +57,16 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 20, padding: 4, background: '#f0ece4', borderRadius: 12 }}>
-          {['worker', 'admin'].map((type) => (
-            <button key={type} type="button" onClick={() => setAccountType(type)} style={{ border: 0, borderRadius: 9, padding: '10px 8px', cursor: 'pointer', fontWeight: 700, textTransform: 'capitalize', background: accountType === type ? '#3b6e44' : 'transparent', color: accountType === type ? '#fff' : '#5e584f' }}>
-              {type === 'worker' ? '👷 Worker' : '🛡️ Admin'}
-            </button>
-          ))}
-        </div>
-
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
-          {accountType === 'worker' ? (
-            <label style={labelStyle}>Worker ID
-              <input type="text" autoComplete="username" required value={workerId} onChange={(event) => setWorkerId(event.target.value)} placeholder="For example: worker-1" style={inputStyle} />
-            </label>
-          ) : (
-            <label style={labelStyle}>Admin email
-              <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} style={inputStyle} />
-            </label>
-          )}
+          <label style={labelStyle}>Name
+            <input type="text" autoComplete="username" required value={name} onChange={(event) => setName(event.target.value)} placeholder="Enter your name" style={inputStyle} />
+          </label>
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />
           </label>
           {error && <p style={{ margin: 0, color: '#b42318', fontSize: 13, fontWeight: 600 }}>{error}</p>}
           <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: 10, padding: '12px 16px', background: '#3b6e44', color: '#fff', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
-            {submitting ? 'Signing in…' : `Sign in as ${accountType}`}
+            {submitting ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
       </section>

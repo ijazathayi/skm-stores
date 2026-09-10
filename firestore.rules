@@ -8,12 +8,12 @@ service cloud.firestore {
 
     function isAdmin() {
       return signedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        get(/databases/$(database)/documents/user/$(request.auth.uid)).data.role == 'admin';
     }
 
     // Each person may read only their own account role. Create roles in the
     // Firebase console or through a trusted server, never from the app.
-    match /users/{userId} {
+    match /user/{userId} {
       allow read: if signedIn() && request.auth.uid == userId;
       allow write: if false;
     }

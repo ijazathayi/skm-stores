@@ -31,7 +31,7 @@ export default function LoginPage() {
       const loginEmail = `${cleanName}@skm.local`;
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
-      const profile = await getDoc(doc(db, 'users', result.user.uid));
+      const profile = await getDoc(doc(db, 'user', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;
       if (role !== 'admin' && role !== 'worker') {
         await signOut(auth);

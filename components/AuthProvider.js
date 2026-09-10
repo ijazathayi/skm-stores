@@ -21,7 +21,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const profile = await getDoc(doc(db, 'users', nextUser.uid));
+      const profile = await getDoc(doc(db, 'user', nextUser.uid));
       const nextRole = profile.exists() ? profile.data().role : null;
       setUser(nextUser);
       setRole(nextRole === 'admin' || nextRole === 'worker' ? nextRole : null);

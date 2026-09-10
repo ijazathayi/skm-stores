@@ -7,13 +7,13 @@
    - Everyone signs in using only their name and password. The app turns the name into the internal Firebase email automatically.
 3. Copy each user's UID. In Firestore, create this document for each person:
 
-   - Collection: `users`
+   - Collection: `user`
    - Document ID: that user's Firebase UID
    - Field: `role` (string)
    - Value: `admin` for an administrator, or `worker` for a worker
 
 4. In Firestore **Rules**, publish the contents of `firestore.rules` from this project.
 
-Workers can use the store pages but cannot open the Admin page. Administrators are sent directly to the Admin page and can delete records. A person whose `users/{uid}` document does not have a valid role cannot sign in to the app.
+Workers can use the store pages but cannot open the Admin page. Administrators are sent directly to the Admin page and can delete records. A person whose `user/{uid}` document does not have a valid role cannot sign in to the app.
 
 Login remains active on the same device and browser until the person uses **Sign out**. It will not remain active in a different browser or device.

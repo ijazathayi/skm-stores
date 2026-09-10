@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy, writeBatch, getDocs, where
+  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
@@ -44,6 +44,10 @@ export default function DebtorsApp() {
   const [custName, setCustName] = useState('');
   const [custMobile, setCustMobile] = useState('');
   const [isSubmittingCust, setIsSubmittingCust] = useState(false);
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [editCustomerName, setEditCustomerName] = useState('');
+  const [editCustomerMobile, setEditCustomerMobile] = useState('');
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
 
   // Debt form
   const [debtProduct, setDebtProduct] = useState('');
@@ -145,24 +149,37 @@ export default function DebtorsApp() {
     }
   }
 
-  async function deleteCustomer() {
-    if (!selectedId || !currentCustomer) return;
-    if (!confirm(isTa ? `"${currentCustomer.name}" மற்றும் அவரது அனைத்து கடன் கணக்குகளையும் நீக்கவா?` : `Delete "${currentCustomer.name}" and all their debt/payment entries?`)) return;
+  function startEditingCustomer() {
+    if (!currentCustomer) return;
+    setEditCustomerName(currentCustomer.name || '');
+    setEditCustomerMobile(currentCustomer.mobile || '');
+    setIsEditingCustomer(true);
+  }
+
+  function cancelEditingCustomer() {
+    setIsEditingCustomer(false);
+    setEditCustomerName('');
+    setEditCustomerMobile('');
+  }
+
+  async function saveCustomerDetails(e) {
+    e.preventDefault();
+    if (!selectedId || isSavingCustomer) return;
+    const name = editCustomerName.trim();
+    const mobile = editCustomerMobile.trim();
+    if (!name) {
+      alert(isTa ? 'வாடிக்கையாளர் பெயரை உள்ளிடவும்' : 'Enter a customer name');
+      return;
+    }
 
     try {
-      const cId = selectedId;
-      setSelectedId(null);
-
-      // Delete customer document
-      await deleteDoc(doc(db, 'debtors_customers', cId));
-
-      // Batch delete related entries
-      const entriesSnap = await getDocs(query(collection(db, 'debtors_entries'), where('customerId', '==', cId)));
-      const batch = writeBatch(db);
-      entriesSnap.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
+      setIsSavingCustomer(true);
+      await updateDoc(doc(db, 'debtors_customers', selectedId), { name, mobile });
+      cancelEditingCustomer();
     } catch (err) {
-      alert('Error deleting customer: ' + err.message);
+      alert('Error updating customer: ' + err.message);
+    } finally {
+      setIsSavingCustomer(false);
     }
   }
 
@@ -227,15 +244,6 @@ export default function DebtorsApp() {
     }
   }
 
-  async function deleteEntry(entryId) {
-    if (!confirm(isTa ? 'இந்த பதிவை நீக்கவா?' : 'Delete this entry?')) return;
-    try {
-      await deleteDoc(doc(db, 'debtors_entries', entryId));
-    } catch (err) {
-      alert('Error deleting entry: ' + err.message);
-    }
-  }
-
   /* ── WhatsApp share ── */
   function shareWhatsApp() {
     if (!currentCustomer) return;
@@ -256,11 +264,11 @@ export default function DebtorsApp() {
   const ledgerRows = currentCustomer ? getCustomerEntries(currentCustomer.id) : [];
   const customerBalance = currentCustomer ? getCustomerBalance(currentCustomer.id) : 0;
 
-  let running = 0;
-  const ledgerWithRunning = ledgerRows.map((e) => {
-    running += e.kind === 'debt' ? (Number(e.amount) || 0) : -(Number(e.amount) || 0);
-    return { ...e, running };
-  });
+  const ledgerWithRunning = ledgerRows.reduce(({ running, rows }, e) => {
+    const nextRunning = running + (e.kind === 'debt' ? (Number(e.amount) || 0) : -(Number(e.amount) || 0));
+    rows.push({ ...e, running: nextRunning });
+    return { running: nextRunning, rows };
+  }, { running: 0, rows: [] }).rows;
 
   return (
     <div style={{
@@ -339,7 +347,10 @@ export default function DebtorsApp() {
                 <li key={c.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(c.id)}
+                    onClick={() => {
+                      setSelectedId(c.id);
+                      setIsEditingCustomer(false);
+                    }}
                     style={{
                       width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
                       background: c.id === selectedId ? 'rgba(255,244,222,.95)' : 'rgba(255,255,255,.6)',
@@ -385,6 +396,26 @@ export default function DebtorsApp() {
                   </div>
                 </div>
 
+                {isEditingCustomer ? (
+                  <form onSubmit={saveCustomerDetails} style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16, padding: 14, borderRadius: 14, background: 'rgba(255,244,222,.75)', border: '1px solid rgba(224,163,37,.38)' }}>
+                    <p style={{ margin: 0, fontWeight: 700 }}>{isTa ? 'வாடிக்கையாளர் விவரங்களைத் திருத்தவும்' : 'Edit customer details'}</p>
+                    <input value={editCustomerName} onChange={(e) => setEditCustomerName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
+                    <input value={editCustomerMobile} onChange={(e) => setEditCustomerMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண் (விருப்பம்)' : 'Mobile number (optional)'} inputMode="tel" pattern="[0-9 +\\-]{6,15}" style={fieldStyle} />
+                    <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
+                      <button type="submit" disabled={isSavingCustomer} style={{ ...brandBtn, opacity: isSavingCustomer ? 0.7 : 1 }}>
+                        {isSavingCustomer ? (isTa ? 'சேமிக்கிறது…' : 'Saving...') : (isTa ? 'விவரங்களைச் சேமி' : 'Save details')}
+                      </button>
+                      <button type="button" onClick={cancelEditingCustomer} disabled={isSavingCustomer} style={secondaryBtn}>
+                        {isTa ? 'ரத்துசெய்' : 'Cancel'}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <button type="button" onClick={startEditingCustomer} style={{ ...secondaryBtn, marginTop: 16 }}>
+                    {isTa ? 'வாடிக்கையாளர் விவரங்களைத் திருத்து' : 'Edit customer details'}
+                  </button>
+                )}
+
                 {/* Forms */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginTop: 18 }}>
                   {/* Debt form */}
@@ -420,17 +451,17 @@ export default function DebtorsApp() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
                     <thead>
                       <tr>
-                        {['Date', 'Details', 'Debt', 'Paid', 'Running', ''].map((h, i) => (
+                        {['Date', 'Details', 'Debt', 'Paid', 'Running'].map((h, i) => (
                           <th key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', textAlign: i >= 2 ? 'right' : 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', color: '#8a6a4f', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {ledgerWithRunning.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: '26px 12px', textAlign: 'center', color: '#8a6a4f' }}>No entries yet.</td></tr>
+                        <tr><td colSpan={5} style={{ padding: '26px 12px', textAlign: 'center', color: '#8a6a4f' }}>No entries yet.</td></tr>
                       ) : ledgerWithRunning.map((e) => {
                         const details = e.kind === 'debt'
-                          ? `${escapeHtml(e.product || 'Purchase')}${e.quantity ? ` × ${e.quantity}` : ''}${e.note ? ` — ${escapeHtml(e.note)}` : ''}`
+                          ? `${escapeHtml(e.product || 'Purchase')}${e.qty ? ` × ${e.qty}` : ''}${e.note ? ` — ${escapeHtml(e.note)}` : ''}`
                           : `Repayment${e.note ? ` — ${escapeHtml(e.note)}` : ''}`;
                         return (
                           <tr key={e.id}>
@@ -439,19 +470,12 @@ export default function DebtorsApp() {
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'debt' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'payment' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>{money(e.running)}</td>
-                            <td style={ledgerTd}>
-                              <button type="button" onClick={() => deleteEntry(e.id)} style={{ background: 'transparent', border: 'none', color: '#a8321c', padding: '2px 6px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>✕</button>
-                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-
-                <button type="button" onClick={deleteCustomer} style={{ marginTop: 18, background: 'transparent', borderRadius: 12, padding: '11px 14px', border: '1px solid rgba(180,50,30,.35)', color: '#a8321c', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 }}>
-                  Delete customer
-                </button>
               </>
             )}
           </section>
@@ -465,6 +489,7 @@ export default function DebtorsApp() {
 const cardStyle = { background: 'rgba(255,251,244,.85)', border: '1px solid rgba(122,84,48,.18)', borderRadius: 20, padding: 20, backdropFilter: 'blur(12px)', boxShadow: '0 18px 40px rgba(122,84,48,.12)' };
 const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)' };
+const secondaryBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.26)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
 const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };

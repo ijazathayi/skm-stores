@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -30,7 +30,8 @@ export default function LoginPage() {
       }
       // Firebase email/password authentication still needs an email internally.
       // Workers only enter their ID; it maps to a private SKM account address.
-      const loginEmail = accountType === 'worker' ? `${cleanWorkerId}@workers.skm.local` : email.trim();
+      const loginEmail = accountType === 'worker' ? `${cleanWorkerId}@skm.local` : email.trim();
+      await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'users', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;

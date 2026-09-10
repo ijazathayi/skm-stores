@@ -113,12 +113,11 @@ export default function DebtorsApp() {
   const balances = customers.map((c) => ({ c, bal: getCustomerBalance(c.id) }));
   const statOutstanding = balances.reduce((t, b) => t + Math.max(b.bal, 0), 0);
   const statOpen = balances.filter((b) => b.bal > 0).length;
-  const statPriority = customers.filter((c) => hasMobile(c.mobile)).length;
 
   const q = searchQuery.trim().toLowerCase();
   const filteredList = balances
     .filter(({ c }) => !q || (c.name || '').toLowerCase().includes(q) || (c.mobile || '').includes(q))
-    .sort((a, b) => Number(hasMobile(b.c.mobile)) - Number(hasMobile(a.c.mobile)) || b.bal - a.bal || (a.c.name || '').localeCompare(b.c.name || ''));
+    .sort((a, b) => b.bal - a.bal || (a.c.name || '').localeCompare(b.c.name || ''));
 
   const currentCustomer = customers.find((c) => c.id === selectedId) || null;
 
@@ -134,7 +133,6 @@ export default function DebtorsApp() {
       const docRef = await addDoc(collection(db, 'debtors_customers'), {
         name,
         mobile,
-        priorityCustomer: hasMobile(mobile),
         createdAt: new Date().toISOString()
       });
       setSelectedId(docRef.id);
@@ -306,7 +304,6 @@ export default function DebtorsApp() {
           {[
             [isTa ? 'மொத்த நிலுவை' : 'Total outstanding', money(statOutstanding)],
             [isTa ? 'நிலுவை கணக்குகள்' : 'Open accounts', String(statOpen)],
-            [isTa ? 'முன்னுரிமை வாடிக்கையாளர்கள்' : 'Priority customers', String(statPriority)],
             [isTa ? 'வழங்கப்பட்ட கடன்' : 'Credit given', money(totalDebt)],
             [isTa ? 'பெறப்பட்ட தொகை' : 'Repayments', money(totalPaid)],
           ].map(([label, val]) => (
@@ -328,9 +325,6 @@ export default function DebtorsApp() {
             <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
               <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
               <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண் (விருப்பம்)' : 'Mobile number (optional)'} inputMode="tel" pattern="[0-9 +\-]{6,15}" style={fieldStyle} />
-              <small style={{ color: '#8a6a4f', marginTop: -3 }}>
-                {isTa ? 'அலைபேசி எண் உள்ள வாடிக்கையாளர்கள் முன்னுரிமை வாடிக்கையாளர்களாக சேர்க்கப்படுவார்கள்.' : 'Customers with a mobile number are added as priority customers.'}
-              </small>
               <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
                 {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Register customer')}
               </button>
@@ -360,7 +354,6 @@ export default function DebtorsApp() {
                       <span>
                         <strong style={{ display: 'block' }}>{escapeHtml(c.name)}</strong>
                         <small style={{ display: 'block', color: '#8a6a4f' }}>{mobileLabel(c.mobile)}</small>
-                        {hasMobile(c.mobile) && <small style={priorityBadge}>{isTa ? 'முன்னுரிமை வாடிக்கையாளர்' : 'Priority customer'}</small>}
                       </span>
                     </span>
                     <span style={{ fontFamily: 'Georgia, serif', fontSize: 17, color: bal > 0 ? '#3a2415' : '#3f7d3f' }}>
@@ -383,7 +376,6 @@ export default function DebtorsApp() {
                   <div>
                     <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>{currentCustomer.name}</h2>
                     <p style={{ color: '#8a6a4f', margin: '2px 0 0', fontSize: 14 }}>{mobileLabel(currentCustomer.mobile)}</p>
-                    {hasMobile(currentCustomer.mobile) && <span style={priorityBadge}>{isTa ? 'முன்னுரிமை வாடிக்கையாளர்' : 'Priority customer'}</span>}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Balance due</p>
@@ -476,4 +468,3 @@ const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color:
 const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
 const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };
-const priorityBadge = { display: 'inline-block', marginTop: 5, padding: '3px 7px', borderRadius: 999, background: 'rgba(224,163,37,.22)', color: '#79520a', fontSize: 10, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase' };

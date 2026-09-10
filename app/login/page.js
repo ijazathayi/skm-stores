@@ -10,6 +10,7 @@ import { auth, db } from '@/lib/firebase';
 export default function LoginPage() {
   const router = useRouter();
   const [accountType, setAccountType] = useState('worker');
+  const [workerId, setWorkerId] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -22,7 +23,15 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const result = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const cleanWorkerId = workerId.trim().toLowerCase();
+      if (accountType === 'worker' && !/^[a-z0-9._-]{3,30}$/.test(cleanWorkerId)) {
+        setError('Enter a Worker ID using 3–30 letters, numbers, dots, dashes, or underscores.');
+        return;
+      }
+      // Firebase email/password authentication still needs an email internally.
+      // Workers only enter their ID; it maps to a private SKM account address.
+      const loginEmail = accountType === 'worker' ? `${cleanWorkerId}@workers.skm.local` : email.trim();
+      const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'users', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;
       if (role !== accountType) {
@@ -58,9 +67,15 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
-          <label style={labelStyle}>Email
-            <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} style={inputStyle} />
-          </label>
+          {accountType === 'worker' ? (
+            <label style={labelStyle}>Worker ID
+              <input type="text" autoComplete="username" required value={workerId} onChange={(event) => setWorkerId(event.target.value)} placeholder="For example: worker-1" style={inputStyle} />
+            </label>
+          ) : (
+            <label style={labelStyle}>Admin email
+              <input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} style={inputStyle} />
+            </label>
+          )}
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />
           </label>

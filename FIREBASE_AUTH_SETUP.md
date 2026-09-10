@@ -2,6 +2,9 @@
 
 1. In the Firebase console for **skm-billing-33a82**, open **Authentication** → **Sign-in method** and enable **Email/Password**.
 2. In **Authentication** → **Users**, create an email/password account for every worker and administrator.
+
+   - For an administrator, use their real email address. They will sign in with that email.
+   - For a worker, choose a Worker ID such as `worker-1` or `worker-2`, then create the Firebase account using `WORKER-ID@workers.skm.local` as its email. For example, Worker ID `worker-1` uses `worker-1@workers.skm.local`. The worker will only enter `worker-1` and their password in the app; they will never need to enter or know this email.
 3. Copy each user's UID. In Firestore, create this document for each person:
 
    - Collection: `users`

@@ -1,5 +1,7 @@
 import './globals.css';
 import { StoreProvider } from '@/lib/store';
+import { AuthProvider } from '@/components/AuthProvider';
+import AuthGate from '@/components/AuthGate';
 
 export const metadata = {
   title: 'SKM Stores',
@@ -24,9 +26,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <StoreProvider>
-          {children}
-        </StoreProvider>
+        <AuthProvider>
+          <StoreProvider>
+            <AuthGate>{children}</AuthGate>
+          </StoreProvider>
+        </AuthProvider>
       </body>
     </html>
   );

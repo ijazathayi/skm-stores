@@ -4,9 +4,11 @@ import Link from 'next/link';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
 import { t } from '@/lib/translations';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Header({ backHref, title, showLangToggle = true }) {
   const { connected, todaySales, lang, setLang } = useStore();
+  const { user, role, signOut } = useAuth();
   const isTa = lang === 'ta';
 
   return (
@@ -108,6 +110,14 @@ export default function Header({ backHref, title, showLangToggle = true }) {
             {money(todaySales())}
           </span>
         </div>
+        <button
+          type="button"
+          onClick={signOut}
+          title={user?.email || ''}
+          style={{ border: '1px solid var(--border)', borderRadius: 999, background: 'var(--card)', color: 'var(--ink3)', padding: '7px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+        >
+          {role === 'admin' ? 'Admin' : 'Worker'} · Sign out
+        </button>
       </div>
     </header>
   );

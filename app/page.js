@@ -2,9 +2,11 @@
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
+import { useAuth } from '@/components/AuthProvider';
 
 export default function Home() {
   const store = useStore();
+  const { role } = useAuth();
   const { lang } = store;
   const isTa = lang === 'ta';
 
@@ -51,12 +53,12 @@ export default function Home() {
       name: isTa ? 'கடன் புத்தகம்' : 'Debtors Book',
       sub: isTa ? 'வாடிக்கையாளர் கடன் கணக்கு' : 'Customer debt ledger'
     },
-    {
+    ...(role === 'admin' ? [{
       href: '/admin',
       icon: '🛡️',
       name: isTa ? 'நிர்வாகம்' : 'Admin',
       sub: isTa ? 'மேலாண்மை கருவிகள்' : 'Overview & tools'
-    },
+    }] : []),
     {
       href: '/settings',
       icon: '⚙️',

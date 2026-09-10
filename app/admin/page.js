@@ -1,87 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
-
-const ADMIN_PASSWORD = 'skm@ijaz';
-
-/* ── Password lock screen ── */
-function PasswordGate({ onUnlock }) {
-  const [input, setInput]   = useState('');
-  const [error, setError]   = useState('');
-  const [show,  setShow]    = useState(false);
-
-  const attempt = (e) => {
-    e.preventDefault();
-    if (input === ADMIN_PASSWORD) {
-      sessionStorage.setItem('skm-admin-auth', '1');
-      onUnlock();
-    } else {
-      setError('Incorrect password. Try again.');
-      setInput('');
-    }
-  };
-
-  return (
-    <div style={{
-      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--paper)', padding: 24,
-    }}>
-      <div style={{
-        background: 'var(--card)', borderRadius: 16,
-        boxShadow: '0 4px 32px rgba(0,0,0,.12)',
-        padding: '36px 32px', width: 'min(360px, 100%)', textAlign: 'center',
-      }}>
-        <div style={{ fontSize: 44, marginBottom: 12 }}>🛡️</div>
-        <h2 style={{ margin: '0 0 4px', fontFamily: 'Georgia, serif', fontSize: 20 }}>Admin Access</h2>
-        <p style={{ margin: '0 0 24px', fontSize: 13, color: 'var(--ink3)' }}>Enter the admin password to continue.</p>
-
-        <form onSubmit={attempt} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ position: 'relative' }}>
-            <input
-              type={show ? 'text' : 'password'}
-              value={input}
-              onChange={(e) => { setInput(e.target.value); setError(''); }}
-              placeholder="Password"
-              autoFocus
-              style={{
-                width: '100%', padding: '12px 44px 12px 14px',
-                borderRadius: 10, border: '1.5px solid var(--border)',
-                fontSize: 15, background: 'var(--paper)', color: 'var(--ink)',
-                boxSizing: 'border-box',
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShow((s) => !s)}
-              style={{
-                position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                background: 'transparent', border: 'none', cursor: 'pointer',
-                fontSize: 18, color: 'var(--ink3)', padding: 4,
-              }}
-              aria-label={show ? 'Hide password' : 'Show password'}
-            >
-              {show ? '🙈' : '👁️'}
-            </button>
-          </div>
-
-          {error && (
-            <div style={{ fontSize: 13, color: 'var(--danger)', fontWeight: 600 }}>{error}</div>
-          )}
-
-          <button
-            type="submit"
-            className="btn-primary"
-            style={{ width: '100%', justifyContent: 'center', fontSize: 15 }}>
-            Unlock
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 export default function AdminPage() {
   const {
@@ -91,20 +12,11 @@ export default function AdminPage() {
   } = useStore();
   const isTa = lang === 'ta';
 
-  // ── auth gate ── (all hooks must come before any early return)
-  const [authed, setAuthed] = useState(false);
-  useEffect(() => {
-    if (sessionStorage.getItem('skm-admin-auth') === '1') setAuthed(true);
-  }, []);
-
   // ── milk price edit state ──
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft]       = useState([]);
   const [saving, setSaving]     = useState(false);
   const [saveMsg, setSaveMsg]   = useState('');
-
-  // ── gate render — AFTER all hooks ──
-  if (!authed) return <PasswordGate onUnlock={() => setAuthed(true)} />;
 
   const totalRevenue = bills.reduce((s, b) => s + (b.total || 0), 0);
 

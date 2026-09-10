@@ -19,9 +19,9 @@ export default function LoginPage() {
     if (submitting) return;
     setError('');
     setSubmitting(true);
+    const cleanName = name.trim().toLowerCase();
 
     try {
-      const cleanName = name.trim().toLowerCase();
       if (!/^[a-z0-9._-]{3,30}$/.test(cleanName)) {
         setError('Enter a name using 3–30 letters, numbers, dots, dashes, or underscores.');
         return;
@@ -40,7 +40,15 @@ export default function LoginPage() {
       }
       router.replace(role === 'admin' ? '/admin' : '/');
     } catch (err) {
-      setError(err.code === 'auth/invalid-credential' ? 'Email or password is incorrect.' : 'Unable to sign in. Please try again.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError(`Name or password is incorrect. Make sure the Firebase account ${cleanName}@skm.local has been created first.`);
+      } else if (err.code === 'auth/network-request-failed') {
+        setError('Unable to reach Firebase. Check the internet connection and try again.');
+      } else if (err.code === 'permission-denied') {
+        setError('Signed in, but this user has no readable role. Ask the administrator to add the user role in Firebase.');
+      } else {
+        setError('Unable to sign in. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }

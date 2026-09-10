@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { browserLocalPersistence, setPersistence, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { startAuthentication } from '@simplewebauthn/browser';
+import { signInWithCustomToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
@@ -13,6 +15,46 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  async function readPasskeyResponse(response) {
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'Fingerprint sign-in could not be completed.');
+    return body;
+  }
+
+  async function signInWithFingerprint() {
+    if (submitting) return;
+    const cleanName = name.trim().toLowerCase();
+    if (!/^[a-z0-9._-]{3,30}$/.test(cleanName)) {
+      setError('Enter your name first, then use fingerprint sign-in.');
+      return;
+    }
+    if (!window.PublicKeyCredential) {
+      setError('This browser or device does not support fingerprint sign-in.');
+      return;
+    }
+    setError('');
+    setSubmitting(true);
+    try {
+      const options = await readPasskeyResponse(await fetch('/api/passkeys/login/options', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: cleanName }),
+      }));
+      const response = await startAuthentication({ optionsJSON: options });
+      const { token } = await readPasskeyResponse(await fetch('/api/passkeys/login/verify', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: cleanName, response }),
+      }));
+      await setPersistence(auth, browserLocalPersistence);
+      const result = await signInWithCustomToken(auth, token);
+      const profile = await getDoc(doc(db, 'user', result.user.uid));
+      const role = profile.exists() ? profile.data().role : null;
+      if (role !== 'admin' && role !== 'worker') throw new Error('This account has no assigned role.');
+      router.replace(role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      setError(err.name === 'NotAllowedError' ? 'Fingerprint sign-in was cancelled.' : err.message || 'Fingerprint sign-in could not be completed.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   async function submit(event) {
     event.preventDefault();
@@ -75,6 +117,9 @@ export default function LoginPage() {
           {error && <p style={{ margin: 0, color: '#b42318', fontSize: 13, fontWeight: 600 }}>{error}</p>}
           <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: 10, padding: '12px 16px', background: '#3b6e44', color: '#fff', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
             {submitting ? 'Signing in…' : 'Sign in'}
+          </button>
+          <button type="button" onClick={signInWithFingerprint} disabled={submitting} style={{ border: '1px solid #3b6e44', borderRadius: 10, padding: '11px 16px', background: '#fffdf8', color: '#28582f', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
+            🫆 Sign in with fingerprint
           </button>
         </form>
       </section>

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
+import PasskeySetup from '@/components/PasskeySetup';
 import { useStore } from '@/lib/store';
 
 const LS = (k, def) => typeof window !== 'undefined' ? (localStorage.getItem(k) || def) : def;
@@ -116,6 +117,8 @@ export default function SettingsPage() {
             {saved}
           </div>
         )}
+
+        <PasskeySetup />
 
         {/* ── Store Profile ── */}
         <div className="settings-card">

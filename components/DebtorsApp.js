@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
+  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
@@ -257,20 +257,6 @@ export default function DebtorsApp() {
     }
   }
 
-  async function removeLedgerEntry(entry) {
-    if (!entry?.id) return;
-    const entryType = entry.kind === 'debt' ? 'debt' : 'repayment';
-    if (!window.confirm(
-      `Remove this ${entryType} of ${money(entry.amount)} dated ${fmtDate(entry.date)}? This cannot be undone.`
-    )) return;
-
-    try {
-      await deleteDoc(doc(db, 'debtors_entries', entry.id));
-    } catch (err) {
-      alert('Error removing entry: ' + err.message);
-    }
-  }
-
   /* ── WhatsApp share ── */
   function shareWhatsApp() {
     if (!currentCustomer) return;
@@ -475,17 +461,17 @@ export default function DebtorsApp() {
                 {/* Ledger */}
                 <h3 style={{ margin: '22px 0 10px', fontFamily: 'Georgia, serif', fontSize: 18 }}>Ledger</h3>
                 <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 600 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
                     <thead>
                       <tr>
-                        {['Date', 'Details', 'Debt', 'Paid', 'Running', ''].map((h, i) => (
+                        {['Date', 'Details', 'Debt', 'Paid', 'Running'].map((h, i) => (
                           <th key={i} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', textAlign: i >= 2 ? 'right' : 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', color: '#8a6a4f', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {ledgerWithRunning.length === 0 ? (
-                        <tr><td colSpan={6} style={{ padding: '26px 12px', textAlign: 'center', color: '#8a6a4f' }}>No entries yet.</td></tr>
+                        <tr><td colSpan={5} style={{ padding: '26px 12px', textAlign: 'center', color: '#8a6a4f' }}>No entries yet.</td></tr>
                       ) : ledgerWithRunning.map((e) => {
                         const details = e.kind === 'debt'
                           ? `${escapeHtml(e.product || 'Purchase')}${e.qty ? ` × ${e.qty}` : ''}${e.note ? ` — ${escapeHtml(e.note)}` : ''}`
@@ -497,16 +483,6 @@ export default function DebtorsApp() {
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'debt' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'payment' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>{money(e.running)}</td>
-                            <td style={{ ...ledgerTd, textAlign: 'right' }}>
-                              <button
-                                type="button"
-                                onClick={() => removeLedgerEntry(e)}
-                                aria-label={`Remove ${e.kind} entry`}
-                                style={removeBtn}
-                              >
-                                Remove
-                              </button>
-                            </td>
                           </tr>
                         );
                       })}
@@ -528,6 +504,5 @@ const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, bord
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)' };
 const secondaryBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.26)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
-const removeBtn = { background: 'transparent', border: '1px solid rgba(168,50,28,.45)', color: '#A8321C', fontWeight: 600, borderRadius: 8, padding: '6px 9px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12 };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
 const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };

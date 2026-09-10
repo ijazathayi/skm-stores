@@ -4,7 +4,7 @@ import { money } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
 
 export default function CartDrawer({ open, onClose, onComplete }) {
-  const { cart, removeFromCart, updateCartItem, clearCart, completeSale, isSubmittingSale, cartTotal, lang } = useStore();
+  const { cart, editingBill, removeFromCart, updateCartItem, clearCart, completeSale, isSubmittingSale, cartSubtotal, cartRoundOff, cartTotal, lang } = useStore();
   const isTa = lang === 'ta';
 
   const handleComplete = async () => {
@@ -45,6 +45,11 @@ export default function CartDrawer({ open, onClose, onComplete }) {
 
         {/* body */}
         <div className="drawer-body">
+          {editingBill && (
+            <div style={{ marginBottom: 12, padding: '9px 11px', borderRadius: 8, background: '#FFF5D6', color: '#7A5200', fontSize: 13, fontWeight: 600 }}>
+              {isTa ? `ரசீது #${editingBill.billNo} திருத்தப்படுகிறது` : `Editing bill #${editingBill.billNo}`}
+            </div>
+          )}
           {cart.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 0' }}>
               <div style={{ fontSize: 44, marginBottom: 12 }}>🛒</div>
@@ -124,6 +129,18 @@ export default function CartDrawer({ open, onClose, onComplete }) {
 
         {/* foot */}
         <div className="drawer-foot">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+            <span style={{ fontSize: 14, color: 'var(--ink3)' }}>{isTa ? 'கூட்டுத்தொகை' : 'Subtotal'}</span>
+            <span style={{ fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 15, fontWeight: 600 }}>
+              {money(cartSubtotal())}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <span style={{ fontSize: 14, color: 'var(--ink3)' }}>{isTa ? 'ரவுண்டு ஆஃப்' : 'Round off'}</span>
+            <span style={{ fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 15, fontWeight: 600 }}>
+              {cartRoundOff() > 0 ? '+' : ''}{money(cartRoundOff())}
+            </span>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
             <span style={{ fontSize: 16, fontWeight: 600 }}>{isTa ? 'மொத்த தொகை' : 'Total'}</span>
             <span style={{ fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 26, fontWeight: 700, color: 'var(--primary-dark)' }}>
@@ -133,7 +150,11 @@ export default function CartDrawer({ open, onClose, onComplete }) {
           <button className="btn-primary" style={{ width: '100%' }}
             onClick={handleComplete}
             disabled={cart.length === 0 || isSubmittingSale}>
-            {isSubmittingSale ? (isTa ? 'சேமிக்கப்படுகிறது…' : 'Saving…') : (isTa ? 'விற்பனையை முடிக்க' : 'Complete sale')}
+            {isSubmittingSale
+              ? (isTa ? 'சேமிக்கப்படுகிறது…' : 'Saving…')
+              : editingBill
+                ? (isTa ? 'மாற்றங்களைச் சேமிக்க' : 'Save changes')
+                : (isTa ? 'விற்பனையை முடிக்க' : 'Complete sale')}
           </button>
         </div>
       </div>

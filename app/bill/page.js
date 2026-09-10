@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
@@ -8,13 +8,17 @@ import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSe
 import { getProductName, t } from '@/lib/translations';
 
 export default function BillPage() {
-  const { inventory, vegPrices, cart, addToCart, bills, storeProfile, lang } = useStore();
+  const { inventory, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang } = useStore();
   const isTa = lang === 'ta';
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastBill, setLastBill] = useState(null);
   const [sortMode, setSortMode] = useState('popular');
+
+  useEffect(() => {
+    if (editingBill) setDrawerOpen(true);
+  }, [editingBill]);
 
   // ── sale count per product ──
   const saleCount = useCallback((name) => {
@@ -64,7 +68,7 @@ export default function BillPage() {
 
   return (
     <>
-      <Header backHref="/" title={isTa ? '🧾 புதிய ரசீது' : '🧾 New Bill'} />
+      <Header backHref="/" title={editingBill ? (isTa ? `📝 ரசீது #${editingBill.billNo} திருத்தம்` : `📝 Edit Bill #${editingBill.billNo}`) : (isTa ? '🧾 புதிய ரசீது' : '🧾 New Bill')} />
       <main className="wrap">
         {/* search */}
         <div className="search-wrap">

@@ -1,5 +1,6 @@
 'use client';
 import Header from '@/components/Header';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
 import { printReceipt } from '@/lib/printReceipt';
@@ -19,13 +20,20 @@ function groupByDate(bills, isTa) {
 }
 
 export default function HistoryPage() {
-  const { bills, todaySales, storeProfile, lang } = useStore();
+  const { bills, todaySales, storeProfile, lang, editBill } = useStore();
+  const router = useRouter();
   const isTa = lang === 'ta';
 
   const printBill = (b) => {
     if (typeof window !== 'undefined') {
       printReceipt(b, storeProfile, { lang });
     }
+  };
+
+  const startEdit = (bill) => {
+    if (typeof window !== 'undefined' && !window.confirm(isTa ? `ரசீது #${bill.billNo} ஐ திருத்த வேண்டுமா?` : `Edit bill #${bill.billNo}?`)) return;
+    editBill(bill);
+    router.push('/bill');
   };
 
   const grouped = groupByDate(bills, isTa);
@@ -76,6 +84,7 @@ export default function HistoryPage() {
                             {money(b.total)}
                           </span>
                           <button className="icon-btn" onClick={() => printBill(b)}>🖨</button>
+                          <button className="icon-btn" title={isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'} onClick={() => startEdit(b)}>✏️</button>
                         </span>
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>

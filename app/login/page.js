@@ -121,13 +121,9 @@ export default function LoginPage() {
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
           <label style={labelStyle}>Name
             <select value={name} onChange={(event) => setName(event.target.value)} autoComplete="username" required style={inputStyle}>
-              <optgroup label="Employees">
-                <option value="siddica">Siddica</option>
-                <option value="kasim">Kasim</option>
-              </optgroup>
-              <optgroup label="Admin">
-                <option value="ijaz">Ijaz</option>
-              </optgroup>
+              <option value="siddica">Siddica</option>
+              <option value="kasim">Kasim</option>
+              <option value="ijaz">Ijaz</option>
             </select>
           </label>
           <label style={labelStyle}>Password

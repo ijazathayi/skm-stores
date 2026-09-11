@@ -229,8 +229,8 @@ export default function RestockPage() {
 
         <div className="restock-columns">
           <section className="restock-panel" id="restock-pending">
-            <h2>Ran out</h2>
-            <p className="restock-sub">Add a product as soon as a shelf goes empty.</p>
+            <h2>Add products</h2>
+            <p className="restock-sub">Add products here, then select them to create a checklist for a shop.</p>
             <div className="restock-inventory-search">
               <label htmlFor="restock-inventory-search">Add from inventory</label>
               <input id="restock-inventory-search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Search inventory products" />
@@ -266,21 +266,21 @@ export default function RestockPage() {
               </div>
             )}
 
-            <div className="restock-batch-bar"><span>{selectedIds.length} selected</span><input value={shop} onChange={(event) => setShop(event.target.value)} placeholder="Shop name" /><button className="restock-primary-btn" disabled={!selectedIds.length} onClick={createBatch}>Make list</button></div>
+            <div className="restock-batch-bar"><span>{selectedIds.length} selected for checklist</span><input value={shop} onChange={(event) => setShop(event.target.value)} placeholder="Shop name" /><button className="restock-primary-btn" disabled={!selectedIds.length} onClick={createBatch}>Create checklist</button></div>
           </section>
 
           <section className="restock-panel" id="restock-trips">
-            <h2>Shopping trips</h2>
-            <p className="restock-sub">Lists created by the whole team.</p>
-            {state.batches.length === 0 ? <div className="restock-empty">No shopping trips yet. Select items and make a list.</div> : (
+            <h2>Shop checklists</h2>
+            <p className="restock-sub">Check an item when staff buy it. Unchecked items still need to be bought.</p>
+            {state.batches.length === 0 ? <div className="restock-empty">No checklists yet. Select products and create one for a shop.</div> : (
               <div>
                 {state.batches.map((batch) => {
                   const bought = batch.items.filter((item) => item.bought).length;
                   const total = batch.items.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
                   return <article className="restock-trip" key={batch.id}>
                     <div className="restock-trip-head"><div><strong>{batch.shop}</strong><small>{formatDate(batch.createdAt)}</small></div><div><button onClick={() => setReceipt(batch)} title="Print">🖨</button><button onClick={() => cancelBatch(batch)} title="Cancel">✕</button></div></div>
-                    {batch.items.map((item) => <label className={`restock-trip-item${item.bought ? ' bought' : ''}`} key={item.id}><input type="checkbox" checked={Boolean(item.bought)} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, items: current.items.map((currentItem) => currentItem.id === item.id ? { ...currentItem, bought: event.target.checked } : currentItem) }))} /><span><strong>{item.name}</strong><small>{formatQty(item)} {item.price ? `· ${formatPrice(item.price)}` : ''}</small></span></label>)}
-                    <div className="restock-trip-foot"><span>{bought} of {batch.items.length} bought</span>{total > 0 && <strong>{formatPrice(total)}</strong>}<button className="restock-primary-btn" onClick={() => finishBatch(batch)}>Finish trip</button></div>
+                    {batch.items.map((item) => <label className={`restock-trip-item${item.bought ? ' bought' : ''}`} key={item.id}><input type="checkbox" aria-label={`${item.name}: ${item.bought ? 'Bought' : 'Still need to buy'}`} checked={Boolean(item.bought)} onChange={(event) => updateBatch(batch.id, (current) => ({ ...current, items: current.items.map((currentItem) => currentItem.id === item.id ? { ...currentItem, bought: event.target.checked } : currentItem) }))} /><span><strong>{item.name}</strong><small>{item.bought ? 'Bought' : 'Still need to buy'} · {formatQty(item)} {item.price ? `· ${formatPrice(item.price)}` : ''}</small></span></label>)}
+                    <div className="restock-trip-foot"><span>{bought} of {batch.items.length} bought</span>{total > 0 && <strong>{formatPrice(total)}</strong>}<button className="restock-primary-btn" onClick={() => finishBatch(batch)}>Complete checklist</button></div>
                   </article>;
                 })}
               </div>

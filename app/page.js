@@ -12,12 +12,6 @@ export default function Home() {
 
   const NAV = [
     {
-      href: '/restock',
-      icon: '📦',
-      name: 'Restock Manager',
-      sub: isTa ? 'சரக்கு மேலாண்மை' : 'Manage stock restocks'
-    },
-    {
       href: '/bill',
       icon: '🧾',
       name: isTa ? 'புதிய ரசீது' : 'New Bill',
@@ -34,6 +28,12 @@ export default function Home() {
       icon: '🥕',
       name: isTa ? 'காய்கறி விலை' : 'Veg Prices',
       sub: isTa ? `${store.vegPrices?.length || 0} வகைகள்` : `${store.vegPrices?.length || 0} items`
+    },
+    {
+      href: '/restock',
+      icon: '📦',
+      name: 'Restock Manager',
+      sub: isTa ? 'சரக்கு மேலாண்மை' : 'Manage stock restocks'
     },
     {
       href: '/history',

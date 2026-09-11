@@ -43,6 +43,8 @@ export default function DebtorsApp() {
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDialog, setActiveDialog] = useState(null);
+  const [overallStartDate, setOverallStartDate] = useState('');
+  const [overallEndDate, setOverallEndDate] = useState('');
 
   // Customer form
   const [custName, setCustName] = useState('');
@@ -133,11 +135,15 @@ export default function DebtorsApp() {
 
   const currentCustomer = customers.find((c) => c.id === selectedId) || null;
   const customerNames = new Map(customers.map((customer) => [customer.id, customer.name]));
-  const overallLedgerRows = [...entries].sort((a, b) => {
+  const overallLedgerRows = entries
+    .filter((entry) => (!overallStartDate || entry.date >= overallStartDate) && (!overallEndDate || entry.date <= overallEndDate))
+    .sort((a, b) => {
     const da = `${a.date || ''}${a.timestamp || a.id}`;
     const db = `${b.date || ''}${b.timestamp || b.id}`;
     return db.localeCompare(da);
   });
+  const overallPayments = overallLedgerRows.filter((entry) => entry.kind === 'payment');
+  const overallReceived = overallPayments.reduce((total, entry) => total + (Number(entry.amount) || 0), 0);
 
   /* ── Customer CRUD ── */
   async function registerCustomer(e) {
@@ -413,7 +419,12 @@ export default function DebtorsApp() {
               <p style={{ margin: '4px 0 12px', color: '#8a6a4f', fontSize: 13 }}>All customer credit and repayment entries together.</p>
             </div>
             <button type="button" onClick={() => setActiveDialog(null)} style={secondaryBtn}>Close</button>
-            <strong style={{ color: '#8a6a4f', fontSize: 13 }}>{todayPaidEntries.length} payments today · {money(todayPaid)} received</strong>
+            <strong style={{ color: '#8a6a4f', fontSize: 13 }}>{overallPayments.length} payments · {money(overallReceived)} received</strong>
+          </div>
+          <div style={{ display: 'flex', gap: 9, alignItems: 'end', flexWrap: 'wrap', marginBottom: 14, padding: 12, borderRadius: 12, background: 'rgba(255,244,222,.72)' }}>
+            <label style={{ ...filterLabel, flex: '1 1 180px' }}>Starting date<input type="date" value={overallStartDate} max={overallEndDate || undefined} onChange={(event) => setOverallStartDate(event.target.value)} style={fieldStyle} /></label>
+            <label style={{ ...filterLabel, flex: '1 1 180px' }}>Ending date<input type="date" value={overallEndDate} min={overallStartDate || undefined} onChange={(event) => setOverallEndDate(event.target.value)} style={fieldStyle} /></label>
+            {(overallStartDate || overallEndDate) && <button type="button" onClick={() => { setOverallStartDate(''); setOverallEndDate(''); }} style={secondaryBtn}>Show all dates</button>}
           </div>
           <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 650 }}>
@@ -620,3 +631,4 @@ const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borde
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
 const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };
 const dialogBackdrop = { position: 'fixed', inset: 0, zIndex: 20, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(58,36,21,.42)' };
+const filterLabel = { display: 'grid', gap: 5, color: '#8a6a4f', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' };

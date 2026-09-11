@@ -14,7 +14,7 @@ export default function AuthGate({ children }) {
   useEffect(() => {
     if (loading) return;
     if (isLoginPage && user && role) {
-      router.replace(role === 'admin' ? '/admin' : '/');
+      router.replace('/');
     } else if (!isLoginPage && (!user || !role)) {
       router.replace('/login');
     } else if (adminOnly && role !== 'admin') {

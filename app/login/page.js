@@ -60,7 +60,7 @@ export default function LoginPage() {
       const role = profile.exists() ? profile.data().role : null;
       if (role !== 'admin' && role !== 'worker') throw new Error('This account has no assigned role.');
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
-      router.replace(role === 'admin' ? '/admin' : '/');
+      router.replace('/');
     } catch (err) {
       setError(err.name === 'NotAllowedError' ? 'Fingerprint sign-in was cancelled.' : err.message || 'Fingerprint sign-in could not be completed.');
     } finally {
@@ -93,7 +93,7 @@ export default function LoginPage() {
         return;
       }
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
-      router.replace(role === 'admin' ? '/admin' : '/');
+      router.replace('/');
     } catch (err) {
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
         setError(`Name or password is incorrect. Make sure the Firebase account ${cleanName}@skm.local has been created first.`);

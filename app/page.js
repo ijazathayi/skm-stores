@@ -12,7 +12,7 @@ export default function Home() {
 
   const NAV = [
     {
-      href: '/restock-book.html',
+      href: '/restock',
       icon: '📦',
       name: 'Restock Manager',
       sub: isTa ? 'சரக்கு மேலாண்மை' : 'Manage stock restocks'

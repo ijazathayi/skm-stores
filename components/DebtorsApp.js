@@ -101,6 +101,10 @@ export default function DebtorsApp() {
   // Compute stats
   const totalDebt = entries.filter((e) => e.kind === 'debt').reduce((t, e) => t + (Number(e.amount) || 0), 0);
   const totalPaid = entries.filter((e) => e.kind === 'payment').reduce((t, e) => t + (Number(e.amount) || 0), 0);
+  const todayEntries = entries.filter((e) => e.date === today());
+  const todayDebt = todayEntries.filter((e) => e.kind === 'debt').reduce((t, e) => t + (Number(e.amount) || 0), 0);
+  const todayPaidEntries = todayEntries.filter((e) => e.kind === 'payment');
+  const todayPaid = todayPaidEntries.reduce((t, e) => t + (Number(e.amount) || 0), 0);
 
   const getCustomerEntries = useCallback((cId) => {
     return entries
@@ -127,6 +131,12 @@ export default function DebtorsApp() {
     .sort((a, b) => b.bal - a.bal || (a.c.name || '').localeCompare(b.c.name || ''));
 
   const currentCustomer = customers.find((c) => c.id === selectedId) || null;
+  const customerNames = new Map(customers.map((customer) => [customer.id, customer.name]));
+  const overallLedgerRows = [...entries].sort((a, b) => {
+    const da = `${a.date || ''}${a.timestamp || a.id}`;
+    const db = `${b.date || ''}${b.timestamp || b.id}`;
+    return db.localeCompare(da);
+  });
 
   /* ── Customer CRUD ── */
   async function registerCustomer(e) {
@@ -352,12 +362,55 @@ export default function DebtorsApp() {
             [isTa ? 'நிலுவை கணக்குகள்' : 'Open accounts', String(statOpen)],
             [isTa ? 'வழங்கப்பட்ட கடன்' : 'Credit given', money(totalDebt)],
             [isTa ? 'பெறப்பட்ட தொகை' : 'Repayments', money(totalPaid)],
+            ['Payments today', `${todayPaidEntries.length} payment${todayPaidEntries.length === 1 ? '' : 's'}`],
+            ['Credit given today', money(todayDebt)],
+            ['Received today', money(todayPaid)],
           ].map(([label, val]) => (
             <div key={label} style={cardStyle}>
               <p style={{ margin: 0, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>{label}</p>
               <p style={{ margin: '6px 0 0', fontFamily: 'Georgia, serif', fontSize: 28 }}>{val}</p>
             </div>
           ))}
+        </section>
+
+        {/* Overall ledger */}
+        <section style={{ ...cardStyle, marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</h2>
+              <p style={{ margin: '4px 0 12px', color: '#8a6a4f', fontSize: 13 }}>All customer credit and repayment entries together.</p>
+            </div>
+            <strong style={{ color: '#8a6a4f', fontSize: 13 }}>{todayPaidEntries.length} payments today · {money(todayPaid)} received</strong>
+          </div>
+          <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 650 }}>
+              <thead>
+                <tr>
+                  {['Date', 'Customer', 'Details', 'Credit', 'Repayment'].map((heading, index) => (
+                    <th key={heading} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', textAlign: index >= 3 ? 'right' : 'left', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', color: '#8a6a4f', whiteSpace: 'nowrap' }}>{heading}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {overallLedgerRows.length === 0 ? (
+                  <tr><td colSpan={5} style={{ padding: '26px 12px', textAlign: 'center', color: '#8a6a4f' }}>No entries yet.</td></tr>
+                ) : overallLedgerRows.map((entry) => {
+                  const details = entry.kind === 'debt'
+                    ? `${escapeHtml(entry.product || 'Purchase')}${entry.qty ? ` × ${entry.qty}` : ''}${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}`
+                    : `Repayment${entry.note ? ` — ${escapeHtml(entry.note)}` : ''}`;
+                  return (
+                    <tr key={entry.id}>
+                      <td style={ledgerTd}>{fmtDate(entry.date)}</td>
+                      <td style={ledgerTd}>{escapeHtml(customerNames.get(entry.customerId) || 'Unknown customer')}</td>
+                      <td style={{ ...ledgerTd, maxWidth: 240 }}>{details}</td>
+                      <td style={{ ...ledgerTd, textAlign: 'right' }}>{entry.kind === 'debt' ? money(entry.amount) : '—'}</td>
+                      <td style={{ ...ledgerTd, textAlign: 'right' }}>{entry.kind === 'payment' ? money(entry.amount) : '—'}{isAdmin && <button type="button" onClick={() => deleteDebtEntry(entry)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button>}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* Layout */}

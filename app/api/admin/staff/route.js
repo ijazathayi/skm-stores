@@ -8,7 +8,7 @@ function cleanName(value) {
 }
 
 function cleanRole(value) {
-  if (value !== 'admin' && value !== 'worker') throw new Error('Role must be admin or worker.');
+  if (value !== 'admin' && value !== 'staff') throw new Error('Role must be admin or staff.');
   return value;
 }
 

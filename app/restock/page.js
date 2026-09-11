@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { useAuth } from '@/components/AuthProvider';
+import { useStore } from '@/lib/store';
+import { matchesSearch } from '@/lib/helpers';
 import { db } from '@/lib/firebase';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
@@ -37,9 +39,11 @@ function normalizeState(value) {
 
 export default function RestockPage() {
   const { user } = useAuth();
+  const { inventory } = useStore();
   const [state, setState] = useState(EMPTY_STATE);
   const [selectedIds, setSelectedIds] = useState([]);
   const [form, setForm] = useState({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
+  const [inventorySearch, setInventorySearch] = useState('');
   const [shop, setShop] = useState('');
   const [toast, setToast] = useState('');
   const [receipt, setReceipt] = useState(null);
@@ -96,6 +100,29 @@ export default function RestockPage() {
     };
     updateState(nextState);
     setForm({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
+  };
+
+  const addInventoryItem = (product) => {
+    if (state.pending.some((item) => item.inventoryId === product.id || (product.productId && item.productId === product.productId))) {
+      setToast('This product is already on the restock list');
+      return;
+    }
+    const nextState = {
+      ...state,
+      pending: [{
+        id: makeId(),
+        productId: product.productId || null,
+        inventoryId: product.id,
+        name: product.name,
+        qty: 1,
+        unit: product.unit === 'kg' ? 'kg' : 'pcs',
+        price: product.price ? Number(product.price) : null,
+        note: '',
+        addedAt: new Date().toISOString(),
+      }, ...state.pending],
+    };
+    updateState(nextState, `${product.name} added to restock list`);
+    setInventorySearch('');
   };
 
   const deleteItem = (id) => {
@@ -174,6 +201,10 @@ export default function RestockPage() {
 
   const pendingTotal = state.pending.length;
   const tripTotal = state.batches.length;
+  const inventoryMatches = inventory
+    .filter((product) => matchesSearch(product, inventorySearch))
+    .filter((product) => inventorySearch.trim())
+    .slice(0, 8);
 
   return (
     <>
@@ -200,6 +231,20 @@ export default function RestockPage() {
           <section className="restock-panel" id="restock-pending">
             <h2>Ran out</h2>
             <p className="restock-sub">Add a product as soon as a shelf goes empty.</p>
+            <div className="restock-inventory-search">
+              <label htmlFor="restock-inventory-search">Add from inventory</label>
+              <input id="restock-inventory-search" value={inventorySearch} onChange={(event) => setInventorySearch(event.target.value)} placeholder="Search inventory products" />
+              {inventorySearch.trim() && (
+                <div className="restock-inventory-results">
+                  {inventoryMatches.length === 0 ? <span className="restock-search-empty">No inventory products found.</span> : inventoryMatches.map((product) => (
+                    <div className="restock-inventory-result" key={product.id}>
+                      <span><strong>{product.name}</strong><small>{product.altName && product.altName !== product.name ? `${product.altName} · ` : ''}{product.price ? formatPrice(product.price) : 'No price'}</small></span>
+                      <button className="restock-primary-btn" type="button" onClick={() => addInventoryItem(product)}>Add</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <form className="restock-add-form" onSubmit={addItem}>
               <input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Product name" required />
               <input type="number" min="0" step="any" value={form.qty} onChange={(event) => setForm({ ...form, qty: event.target.value })} placeholder="Qty" />

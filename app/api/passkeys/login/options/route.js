@@ -1,5 +1,5 @@
 import { generateAuthenticationOptions } from '@simplewebauthn/server';
-import { getPasskeyConfig, getPasskeyServices, requireWorkerOrAdmin, validLoginName } from '@/lib/passkey-server';
+import { getPasskeyConfig, getPasskeyServices, requireStaffOrAdmin, validLoginName } from '@/lib/passkey-server';
 
 export const runtime = 'nodejs';
 
@@ -9,7 +9,7 @@ export async function POST(request) {
     const cleanName = validLoginName(name);
     const { adminAuth, adminDb } = getPasskeyServices();
     const user = await adminAuth.getUserByEmail(`${cleanName}@skm.local`);
-    await requireWorkerOrAdmin(adminDb, user.uid);
+    await requireStaffOrAdmin(adminDb, user.uid);
     const { expectedOrigin, rpID } = getPasskeyConfig(request);
     const credentials = await adminDb.collection('passkeys').doc(user.uid).collection('credentials').get();
     if (credentials.empty) throw new Error('No fingerprint is set up for this account yet.');

@@ -116,7 +116,7 @@ export default function Header({ backHref, title, showLangToggle = true }) {
           title={user?.email || ''}
           style={{ border: '1px solid var(--border)', borderRadius: 999, background: 'var(--card)', color: 'var(--ink3)', padding: '7px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
         >
-          {role === 'admin' ? 'Admin' : 'Worker'} · Sign out
+          {role === 'admin' ? 'Admin' : 'Staff'} · Sign out
         </button>
       </div>
     </header>

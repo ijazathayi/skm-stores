@@ -56,7 +56,7 @@ export default function LoginPage() {
       const result = await signInWithCustomToken(auth, token);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;
-      if (role !== 'admin' && role !== 'worker') throw new Error('This account has no assigned role.');
+      if (role !== 'admin' && role !== 'staff') throw new Error('This account has no assigned role.');
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
       router.replace('/');
     } catch (err) {
@@ -85,7 +85,7 @@ export default function LoginPage() {
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
       const role = profile.exists() ? profile.data().role : null;
-      if (role !== 'admin' && role !== 'worker') {
+      if (role !== 'admin' && role !== 'staff') {
         await signOut(auth);
         setError('This account has no assigned role. Ask the administrator to set it up.');
         return;
@@ -120,7 +120,15 @@ export default function LoginPage() {
 
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
           <label style={labelStyle}>Name
-            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="kasim" autoComplete="username" required style={inputStyle} />
+            <select value={name} onChange={(event) => setName(event.target.value)} autoComplete="username" required style={inputStyle}>
+              <optgroup label="Employees">
+                <option value="siddica">Siddica</option>
+                <option value="kasim">Kasim</option>
+              </optgroup>
+              <optgroup label="Admin">
+                <option value="ijaz">Ijaz</option>
+              </optgroup>
+            </select>
           </label>
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />

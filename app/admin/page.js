@@ -19,7 +19,7 @@ export default function AdminPage() {
   const [saving, setSaving]     = useState(false);
   const [saveMsg, setSaveMsg]   = useState('');
   const [staff, setStaff] = useState([]);
-  const [staffForm, setStaffForm] = useState({ name: '', password: '', role: 'worker' });
+  const [staffForm, setStaffForm] = useState({ name: '', password: '', role: 'staff' });
   const [editingStaff, setEditingStaff] = useState(null);
   const [staffMsg, setStaffMsg] = useState('');
   const [staffSaving, setStaffSaving] = useState(false);
@@ -61,7 +61,7 @@ export default function AdminPage() {
       } else {
         await staffRequest('POST', staffForm);
       }
-      setStaffForm({ name: '', password: '', role: 'worker' });
+      setStaffForm({ name: '', password: '', role: 'staff' });
       setEditingStaff(null);
       setStaffMsg('Staff account saved.');
       await loadStaff();
@@ -85,7 +85,7 @@ export default function AdminPage() {
 
   function beginStaffEdit(member) {
     setEditingStaff(member);
-    setStaffForm({ name: member.name || member.email?.split('@')[0] || '', password: '', role: member.role || 'worker' });
+    setStaffForm({ name: member.name || member.email?.split('@')[0] || '', password: '', role: member.role || 'staff' });
     setStaffMsg('');
   }
 
@@ -185,10 +185,10 @@ export default function AdminPage() {
           <form onSubmit={saveStaff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto', gap: 8, marginBottom: 14 }}>
             <input value={staffForm.name} onChange={(event) => setStaffForm({ ...staffForm, name: event.target.value })} placeholder="Name / login" required style={priceInputStyle} />
             <input type="password" value={staffForm.password} onChange={(event) => setStaffForm({ ...staffForm, password: event.target.value })} placeholder={editingStaff ? 'New password (optional)' : 'Password'} required={!editingStaff} style={priceInputStyle} />
-            <select value={staffForm.role} onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value })} style={priceInputStyle}><option value="worker">Worker</option><option value="admin">Admin</option></select>
+            <select value={staffForm.role} onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value })} style={priceInputStyle}><option value="staff">Staff</option><option value="admin">Admin</option></select>
             <button type="submit" disabled={staffSaving} style={{ background: 'var(--primary)', color: '#fff', border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer' }}>{staffSaving ? 'Saving…' : editingStaff ? 'Update' : 'Add staff'}</button>
           </form>
-          {editingStaff && <button onClick={() => { setEditingStaff(null); setStaffForm({ name: '', password: '', role: 'worker' }); }} style={{ marginBottom: 12, border: 0, background: 'transparent', color: 'var(--ink3)', textDecoration: 'underline', cursor: 'pointer' }}>Cancel editing</button>}
+            {editingStaff && <button onClick={() => { setEditingStaff(null); setStaffForm({ name: '', password: '', role: 'staff' }); }} style={{ marginBottom: 12, border: 0, background: 'transparent', color: 'var(--ink3)', textDecoration: 'underline', cursor: 'pointer' }}>Cancel editing</button>}
           <div className="inv-list">
             {staff.map((member) => <div key={member.id} className="inv-row"><div style={{ flex: 1 }}><strong>{member.name || member.email || member.id}</strong><span style={{ display: 'block', color: 'var(--ink3)', fontSize: 12 }}>{member.email} · {member.role}</span></div><button className="icon-btn" onClick={() => beginStaffEdit(member)} title="Edit staff">✏️</button><button className="icon-btn" onClick={() => removeStaff(member)} title="Delete staff">🗑</button></div>)}
           </div>

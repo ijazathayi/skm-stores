@@ -42,6 +42,7 @@ export default function DebtorsApp() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeDialog, setActiveDialog] = useState(null);
 
   // Customer form
   const [custName, setCustName] = useState('');
@@ -357,17 +358,33 @@ export default function DebtorsApp() {
 
         {/* Quick access */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
-          <button type="button" onClick={() => { document.getElementById('debtors-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); document.getElementById('debtors-customer-name')?.focus(); }} style={{ ...cardStyle, border: '1px solid rgba(194,65,12,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button type="button" onClick={() => setActiveDialog('customer')} style={{ ...cardStyle, border: '1px solid rgba(194,65,12,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick action</span>
             <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>+ Add customer</strong>
             <span style={{ display: 'block', marginTop: 5, color: '#8a6a4f', fontSize: 13 }}>Register a customer and start their ledger.</span>
           </button>
-          <button type="button" onClick={() => document.getElementById('debtors-overall-ledger')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ ...cardStyle, border: '1px solid rgba(58,36,21,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button type="button" onClick={() => setActiveDialog('overall')} style={{ ...cardStyle, border: '1px solid rgba(58,36,21,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick view</span>
             <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</strong>
             <span style={{ display: 'block', marginTop: 5, color: '#8a6a4f', fontSize: 13 }}>See every customer debt and repayment together.</span>
           </button>
         </section>
+
+        {activeDialog === 'customer' && <div style={dialogBackdrop}>
+          <section role="dialog" aria-modal="true" aria-labelledby="add-customer-title" style={{ ...cardStyle, width: 'min(460px, 100%)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+              <h2 id="add-customer-title" style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>Add customer</h2>
+              <button type="button" onClick={() => setActiveDialog(null)} style={secondaryBtn}>Close</button>
+            </div>
+            <form onSubmit={async (event) => { await registerCustomer(event); setActiveDialog(null); }} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+              <input autoFocus id="debtors-customer-name" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
+              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண் (விருப்பம்)' : 'Mobile number (optional)'} inputMode="tel" pattern="[0-9 +\-]{6,15}" style={fieldStyle} />
+              <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
+                {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Add customer')}
+              </button>
+            </form>
+          </section>
+        </div>}
 
         {/* Stats */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
@@ -388,12 +405,14 @@ export default function DebtorsApp() {
         </section>
 
         {/* Overall ledger */}
-        <section id="debtors-overall-ledger" style={{ ...cardStyle, marginBottom: 18, scrollMarginTop: 16 }}>
+        {activeDialog === 'overall' && <div style={dialogBackdrop}>
+          <section role="dialog" aria-modal="true" aria-labelledby="overall-ledger-title" style={{ ...cardStyle, width: 'min(1100px, 100%)', maxHeight: '88dvh', overflow: 'auto' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</h2>
+              <h2 id="overall-ledger-title" style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</h2>
               <p style={{ margin: '4px 0 12px', color: '#8a6a4f', fontSize: 13 }}>All customer credit and repayment entries together.</p>
             </div>
+            <button type="button" onClick={() => setActiveDialog(null)} style={secondaryBtn}>Close</button>
             <strong style={{ color: '#8a6a4f', fontSize: 13 }}>{todayPaidEntries.length} payments today · {money(todayPaid)} received</strong>
           </div>
           <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
@@ -425,23 +444,17 @@ export default function DebtorsApp() {
               </tbody>
             </table>
           </div>
-        </section>
+          </section>
+        </div>}
 
         {/* Layout */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
 
           {/* Left: customer list */}
-          <section id="debtors-customers" style={{ ...cardStyle, scrollMarginTop: 16 }}>
+          <section style={cardStyle}>
             <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>
               {isTa ? 'வாடிக்கையாளர்கள்' : 'Customers'}
             </h2>
-            <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <input id="debtors-customer-name" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
-              <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண் (விருப்பம்)' : 'Mobile number (optional)'} inputMode="tel" pattern="[0-9 +\-]{6,15}" style={fieldStyle} />
-              <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
-                {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Register customer')}
-              </button>
-            </form>
             <input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={isTa ? 'பெயர் அல்லது அலைபேசியைத் தேடுங்கள்' : 'Search name or mobile'} style={{ ...fieldStyle, margin: '14px 0 10px', width: '100%' }} />
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflowY: 'auto' }}>
               {filteredList.length === 0 ? (
@@ -606,3 +619,4 @@ const secondaryBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid r
 const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
 const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };
+const dialogBackdrop = { position: 'fixed', inset: 0, zIndex: 20, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(58,36,21,.42)' };

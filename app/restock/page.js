@@ -48,6 +48,7 @@ export default function RestockPage() {
   const [form, setForm] = useState({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
   const [toast, setToast] = useState('');
   const [receipt, setReceipt] = useState(null);
+  const [activeTab, setActiveTab] = useState('pending');
 
   useEffect(() => {
     const unsubscribe = onSnapshot(RESTOCK_REF, (snapshot) => {
@@ -160,6 +161,7 @@ export default function RestockPage() {
 
   const pendingTotal = state.pending.filter((item) => !item.bought).length;
   const boughtTotal = state.pending.filter((item) => item.bought).length;
+  const visibleItems = state.pending.filter((item) => activeTab === 'purchased' ? item.bought : !item.bought);
   const inventoryMatches = inventory
     .filter((product) => matchesSearch(product, form.name))
     .filter((product) => form.name.trim())
@@ -211,9 +213,14 @@ export default function RestockPage() {
               <button className="restock-primary-btn" type="submit">Add</button>
             </form>
 
-            {state.pending.length === 0 ? <div className="restock-empty">Nothing is out right now. Add a product when you spot an empty shelf.</div> : (
+            <div className="restock-tabs" role="tablist" aria-label="Checklist status">
+              <button type="button" role="tab" aria-selected={activeTab === 'pending'} className={activeTab === 'pending' ? 'active' : ''} onClick={() => setActiveTab('pending')}>To buy ({pendingTotal})</button>
+              <button type="button" role="tab" aria-selected={activeTab === 'purchased'} className={activeTab === 'purchased' ? 'active' : ''} onClick={() => setActiveTab('purchased')}>Purchased ({boughtTotal})</button>
+            </div>
+
+            {visibleItems.length === 0 ? <div className="restock-empty">{activeTab === 'purchased' ? 'No purchased products yet.' : 'Nothing is waiting to be bought. Add a product when you spot an empty shelf.'}</div> : (
               <div className="restock-list">
-                {state.pending.map((item) => (
+                {visibleItems.map((item) => (
                   <div className="restock-item" key={item.id}>
                     <input type="checkbox" aria-label={`${item.name}: ${item.bought ? 'Bought' : 'Still need to buy'}`} checked={Boolean(item.bought)} onChange={(event) => toggleItem(item.id, event.target.checked)} />
                     <div className="restock-item-main"><strong>{item.name}</strong><span>{formatQty(item)} {item.price ? `· ${formatPrice(item.price)}` : ''}</span>{item.note && <small>{item.note}</small>}</div>

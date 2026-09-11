@@ -355,6 +355,20 @@ export default function DebtorsApp() {
 
       <main style={{ padding: '0 clamp(16px,4vw,40px) 56px', maxWidth: 1240, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
+        {/* Quick access */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
+          <button type="button" onClick={() => { document.getElementById('debtors-customers')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); document.getElementById('debtors-customer-name')?.focus(); }} style={{ ...cardStyle, border: '1px solid rgba(194,65,12,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick action</span>
+            <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>+ Add customer</strong>
+            <span style={{ display: 'block', marginTop: 5, color: '#8a6a4f', fontSize: 13 }}>Register a customer and start their ledger.</span>
+          </button>
+          <button type="button" onClick={() => document.getElementById('debtors-overall-ledger')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} style={{ ...cardStyle, border: '1px solid rgba(58,36,21,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
+            <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick view</span>
+            <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</strong>
+            <span style={{ display: 'block', marginTop: 5, color: '#8a6a4f', fontSize: 13 }}>See every customer debt and repayment together.</span>
+          </button>
+        </section>
+
         {/* Stats */}
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
           {[
@@ -374,7 +388,7 @@ export default function DebtorsApp() {
         </section>
 
         {/* Overall ledger */}
-        <section style={{ ...cardStyle, marginBottom: 18 }}>
+        <section id="debtors-overall-ledger" style={{ ...cardStyle, marginBottom: 18, scrollMarginTop: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
             <div>
               <h2 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</h2>
@@ -417,12 +431,12 @@ export default function DebtorsApp() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
 
           {/* Left: customer list */}
-          <section style={cardStyle}>
+          <section id="debtors-customers" style={{ ...cardStyle, scrollMarginTop: 16 }}>
             <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>
               {isTa ? 'வாடிக்கையாளர்கள்' : 'Customers'}
             </h2>
             <form onSubmit={registerCustomer} style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-              <input value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
+              <input id="debtors-customer-name" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder={isTa ? 'வாடிக்கையாளர் பெயர்' : 'Customer name'} required style={fieldStyle} />
               <input value={custMobile} onChange={(e) => setCustMobile(e.target.value)} placeholder={isTa ? 'அலைபேசி எண் (விருப்பம்)' : 'Mobile number (optional)'} inputMode="tel" pattern="[0-9 +\-]{6,15}" style={fieldStyle} />
               <button type="submit" disabled={isSubmittingCust} style={{ ...brandBtn, opacity: isSubmittingCust ? 0.7 : 1 }}>
                 {isSubmittingCust ? (isTa ? 'பதிவாகிறது…' : 'Registering...') : (isTa ? '+ வாடிக்கையாளரை சேர்க்க' : 'Register customer')}

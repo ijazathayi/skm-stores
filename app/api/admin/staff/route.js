@@ -106,11 +106,15 @@ export async function DELETE(request) {
     const body = await request.json();
     const uid = String(body.id || '').trim();
     if (!uid) throw new Error('Staff account id is required.');
-    const decoded = await adminAuth.getUser(uid);
     const requesterToken = request.headers.get('authorization').slice(7);
     const requester = await adminAuth.verifyIdToken(requesterToken);
-    if (decoded.uid === requester.uid) throw new Error('You cannot delete your own administrator account.');
-    await adminAuth.deleteUser(uid);
+    if (uid === requester.uid) throw new Error('You cannot delete your own administrator account.');
+    try {
+      await adminAuth.deleteUser(uid);
+    } catch (error) {
+      // A role document can outlive its Auth account. Admins may clean up that orphan.
+      if (error.code !== 'auth/user-not-found') throw error;
+    }
     await adminDb.collection('user').doc(uid).delete();
     return NextResponse.json({ ok: true });
   } catch (error) {

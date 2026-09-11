@@ -12,6 +12,12 @@ export default function Home() {
 
   const NAV = [
     {
+      href: '/restock-book.html',
+      icon: '📦',
+      name: 'Restock Manager',
+      sub: isTa ? 'சரக்கு மேலாண்மை' : 'Manage stock restocks'
+    },
+    {
       href: '/bill',
       icon: '🧾',
       name: isTa ? 'புதிய ரசீது' : 'New Bill',
@@ -67,43 +73,10 @@ export default function Home() {
     },
   ];
 
-  const restockSummary = [
-    { label: isTa ? 'நிறைவுற்றவை' : 'Pending', value: '08' },
-    { label: isTa ? 'பயணங்கள்' : 'Trips', value: '03' },
-    { label: isTa ? 'அச்சிடல்' : 'Print', value: 'Ready' },
-  ];
-
   return (
     <>
       <Header />
       <main className="wrap" style={{ paddingTop: 12 }}>
-        <section className="restock-callout" aria-label="Restock book summary">
-          <div className="restock-callout-top">
-            <div>
-              <div className="restock-eyebrow">{isTa ? 'விற்பனை உதவி' : 'Store helper'}</div>
-              <h2>{isTa ? 'ரெஸ்டாக் புக்' : 'Restock Book'}</h2>
-            </div>
-            <Link href="/buy-milk" className="restock-button">
-              {isTa ? 'திற' : 'Open'}
-            </Link>
-          </div>
-
-          <p>
-            {isTa
-              ? 'கடையில் காலியாக உள்ள பொருட்களை பதிவு செய்து, கடைகளுக்கு ஏற்ப பிரித்து, அச்சிடுவதற்கு விரைவாக தயாரிக்கவும்.'
-              : 'Track empty shelves, split urgent items by shop, and prepare a clean purchase list in seconds.'}
-          </p>
-
-          <div className="restock-summary-grid">
-            {restockSummary.map((item) => (
-              <div key={item.label} className="restock-chip">
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-
         <div className="home-grid">
           {NAV.map((item) => (
             <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>

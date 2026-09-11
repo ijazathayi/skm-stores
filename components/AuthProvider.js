@@ -52,7 +52,8 @@ export function AuthProvider({ children }) {
 
     try {
       const profile = await getDoc(doc(db, 'user', nextUser.uid));
-      const nextRole = profile.exists() ? profile.data().role : null;
+      const storedRole = profile.exists() ? profile.data().role : null;
+      const nextRole = storedRole === 'worker' ? 'staff' : storedRole;
       setUser(nextUser);
       setRole(nextRole === 'admin' || nextRole === 'staff' ? nextRole : null);
     } catch {

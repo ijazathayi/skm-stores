@@ -55,7 +55,8 @@ export default function LoginPage() {
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithCustomToken(auth, token);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
-      const role = profile.exists() ? profile.data().role : null;
+      const storedRole = profile.exists() ? profile.data().role : null;
+      const role = storedRole === 'worker' ? 'staff' : storedRole;
       if (role !== 'admin' && role !== 'staff') throw new Error('This account has no assigned role.');
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
       router.replace('/');
@@ -84,7 +85,8 @@ export default function LoginPage() {
       await setPersistence(auth, browserLocalPersistence);
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
-      const role = profile.exists() ? profile.data().role : null;
+      const storedRole = profile.exists() ? profile.data().role : null;
+      const role = storedRole === 'worker' ? 'staff' : storedRole;
       if (role !== 'admin' && role !== 'staff') {
         await signOut(auth);
         setError('This account has no assigned role. Ask the administrator to set it up.');

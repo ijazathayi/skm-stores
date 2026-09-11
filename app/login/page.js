@@ -9,11 +9,9 @@ import { signInWithCustomToken } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 
-const loginNames = ['kasim', 'siddica', 'ijaz'];
-
 export default function LoginPage() {
   const router = useRouter();
-  const [name, setName] = useState(loginNames[0]);
+  const [name, setName] = useState('kasim');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -122,11 +120,7 @@ export default function LoginPage() {
 
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
           <label style={labelStyle}>Name
-            <select value={name} onChange={(event) => setName(event.target.value)} style={inputStyle}>
-              {loginNames.map((loginName) => (
-                <option key={loginName} value={loginName}>{loginName}</option>
-              ))}
-            </select>
+            <input value={name} onChange={(event) => setName(event.target.value)} placeholder="kasim" autoComplete="username" required style={inputStyle} />
           </label>
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />

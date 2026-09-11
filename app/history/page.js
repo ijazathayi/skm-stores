@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
 import { printReceipt } from '@/lib/printReceipt';
 import { getProductName } from '@/lib/translations';
+import { useAuth } from '@/components/AuthProvider';
 
 /* Group bills array into { "Sunday, 6 Sep 2026": [bill, …], … } */
 function groupByDate(bills, isTa) {
@@ -20,7 +21,8 @@ function groupByDate(bills, isTa) {
 }
 
 export default function HistoryPage() {
-  const { bills, todaySales, storeProfile, lang, editBill } = useStore();
+  const { bills, todaySales, storeProfile, lang, editBill, deleteSale } = useStore();
+  const { role } = useAuth();
   const router = useRouter();
   const isTa = lang === 'ta';
 
@@ -85,6 +87,7 @@ export default function HistoryPage() {
                           </span>
                           <button className="icon-btn" onClick={() => printBill(b)}>🖨</button>
                           <button className="icon-btn" title={isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'} onClick={() => startEdit(b)}>✏️</button>
+                          {role === 'admin' && <button className="icon-btn" title="Delete sale" onClick={() => { if (window.confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>}
                         </span>
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>

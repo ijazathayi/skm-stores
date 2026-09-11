@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
+import { auth } from '@/lib/firebase';
 
 export default function AdminPage() {
   const {
@@ -17,6 +18,76 @@ export default function AdminPage() {
   const [draft, setDraft]       = useState([]);
   const [saving, setSaving]     = useState(false);
   const [saveMsg, setSaveMsg]   = useState('');
+  const [staff, setStaff] = useState([]);
+  const [staffForm, setStaffForm] = useState({ name: '', password: '', role: 'worker' });
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [staffMsg, setStaffMsg] = useState('');
+  const [staffSaving, setStaffSaving] = useState(false);
+
+  const staffRequest = useCallback(async (method, body) => {
+    const token = await auth.currentUser?.getIdToken();
+    const response = await fetch('/api/admin/staff', {
+      method,
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Staff request failed.');
+    return result;
+  }, []);
+
+  const loadStaff = useCallback(async () => {
+    try {
+      const result = await staffRequest('GET');
+      setStaff(result.staff || []);
+    } catch (error) {
+      setStaffMsg(error.message);
+    }
+  }, [staffRequest]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => { loadStaff(); }, 0);
+    return () => clearTimeout(timer);
+  }, [loadStaff]);
+
+  async function saveStaff(event) {
+    event.preventDefault();
+    if (staffSaving) return;
+    setStaffSaving(true);
+    setStaffMsg('');
+    try {
+      if (editingStaff) {
+        await staffRequest('PATCH', { id: editingStaff.id, ...staffForm });
+      } else {
+        await staffRequest('POST', staffForm);
+      }
+      setStaffForm({ name: '', password: '', role: 'worker' });
+      setEditingStaff(null);
+      setStaffMsg('Staff account saved.');
+      await loadStaff();
+    } catch (error) {
+      setStaffMsg(error.message);
+    } finally {
+      setStaffSaving(false);
+    }
+  }
+
+  async function removeStaff(member) {
+    if (!window.confirm(`Delete the ${member.name || member.email} staff account?`)) return;
+    try {
+      await staffRequest('DELETE', { id: member.id });
+      setStaffMsg('Staff account deleted.');
+      await loadStaff();
+    } catch (error) {
+      setStaffMsg(error.message);
+    }
+  }
+
+  function beginStaffEdit(member) {
+    setEditingStaff(member);
+    setStaffForm({ name: member.name || member.email?.split('@')[0] || '', password: '', role: member.role || 'worker' });
+    setStaffMsg('');
+  }
 
   const totalRevenue = bills.reduce((s, b) => s + (b.total || 0), 0);
 
@@ -100,6 +171,27 @@ export default function AdminPage() {
               <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--primary-dark)', marginTop: 8 }}>{v}</div>
             </div>
           ))}
+        </div>
+
+        {/* ── Staff management ── */}
+        <div className="settings-card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+            <div>
+              <h4 style={{ margin: 0 }}>👥 Staff Management</h4>
+              <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 3 }}>Add, edit roles, reset passwords, or remove staff accounts.</div>
+            </div>
+            {staffMsg && <span style={{ fontSize: 13, color: staffMsg.includes('saved') || staffMsg.includes('deleted') ? 'var(--primary-dark)' : 'var(--danger)' }}>{staffMsg}</span>}
+          </div>
+          <form onSubmit={saveStaff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto', gap: 8, marginBottom: 14 }}>
+            <input value={staffForm.name} onChange={(event) => setStaffForm({ ...staffForm, name: event.target.value })} placeholder="Name / login" required style={priceInputStyle} />
+            <input type="password" value={staffForm.password} onChange={(event) => setStaffForm({ ...staffForm, password: event.target.value })} placeholder={editingStaff ? 'New password (optional)' : 'Password'} required={!editingStaff} style={priceInputStyle} />
+            <select value={staffForm.role} onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value })} style={priceInputStyle}><option value="worker">Worker</option><option value="admin">Admin</option></select>
+            <button type="submit" disabled={staffSaving} style={{ background: 'var(--primary)', color: '#fff', border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer' }}>{staffSaving ? 'Saving…' : editingStaff ? 'Update' : 'Add staff'}</button>
+          </form>
+          {editingStaff && <button onClick={() => { setEditingStaff(null); setStaffForm({ name: '', password: '', role: 'worker' }); }} style={{ marginBottom: 12, border: 0, background: 'transparent', color: 'var(--ink3)', textDecoration: 'underline', cursor: 'pointer' }}>Cancel editing</button>}
+          <div className="inv-list">
+            {staff.map((member) => <div key={member.id} className="inv-row"><div style={{ flex: 1 }}><strong>{member.name || member.email || member.id}</strong><span style={{ display: 'block', color: 'var(--ink3)', fontSize: 12 }}>{member.email} · {member.role}</span></div><button className="icon-btn" onClick={() => beginStaffEdit(member)} title="Edit staff">✏️</button><button className="icon-btn" onClick={() => removeStaff(member)} title="Delete staff">🗑</button></div>)}
+          </div>
         </div>
 
         {/* ── 🥛 Buy Milk Prices ── */}

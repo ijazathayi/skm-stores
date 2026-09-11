@@ -3,10 +3,11 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  collection, onSnapshot, addDoc, doc, updateDoc, query, orderBy
+  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
+import { useAuth } from '@/components/AuthProvider';
 
 /* ── helpers ── */
 const today = () => new Date().toISOString().slice(0, 10);
@@ -33,7 +34,9 @@ function hasMobile(mobile) {
 
 export default function DebtorsApp() {
   const { lang } = useStore();
+  const { role } = useAuth();
   const isTa = lang === 'ta';
+  const isAdmin = role === 'admin';
   const [customers, setCustomers] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +183,28 @@ export default function DebtorsApp() {
       alert('Error updating customer: ' + err.message);
     } finally {
       setIsSavingCustomer(false);
+    }
+  }
+
+  async function deleteDebtEntry(entry) {
+    if (!isAdmin || !window.confirm('Delete this ledger entry permanently?')) return;
+    try {
+      await deleteDoc(doc(db, 'debtors_entries', entry.id));
+    } catch (err) {
+      alert('Error deleting ledger entry: ' + err.message);
+    }
+  }
+
+  async function deleteCustomer() {
+    if (!isAdmin || !currentCustomer) return;
+    if (!window.confirm(`Delete ${currentCustomer.name} and all of this customer's ledger entries?`)) return;
+    try {
+      const customerEntries = entries.filter((entry) => entry.customerId === currentCustomer.id);
+      await Promise.all(customerEntries.map((entry) => deleteDoc(doc(db, 'debtors_entries', entry.id))));
+      await deleteDoc(doc(db, 'debtors_customers', currentCustomer.id));
+      setSelectedId(null);
+    } catch (err) {
+      alert('Error deleting customer: ' + err.message);
     }
   }
 
@@ -424,9 +449,14 @@ export default function DebtorsApp() {
                     </div>
                   </form>
                 ) : (
-                  <button type="button" onClick={startEditingCustomer} style={{ ...secondaryBtn, marginTop: 16 }}>
-                    {isTa ? 'வாடிக்கையாளர் விவரங்களைத் திருத்து' : 'Edit customer details'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+                    <button type="button" onClick={startEditingCustomer} style={secondaryBtn}>
+                      {isTa ? 'வாடிக்கையாளர் விவரங்களைத் திருத்து' : 'Edit customer details'}
+                    </button>
+                    {isAdmin && <button type="button" onClick={deleteCustomer} style={{ ...secondaryBtn, color: '#A8321C', borderColor: '#A8321C' }}>
+                      🗑 Delete customer
+                    </button>}
+                  </div>
                 )}
 
                 {/* Forms */}
@@ -482,7 +512,10 @@ export default function DebtorsApp() {
                             <td style={{ ...ledgerTd, maxWidth: 200 }}>{details}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'debt' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'payment' ? money(e.amount) : '—'}</td>
-                            <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>{money(e.running)}</td>
+                            <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>
+                              <span>{money(e.running)}</span>
+                              {isAdmin && <button type="button" onClick={() => deleteDebtEntry(e)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button>}
+                            </td>
                           </tr>
                         );
                       })}

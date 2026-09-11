@@ -504,10 +504,28 @@ footer.app-footer button{background:none;border:none;color:var(--ink-soft); text
 
 <div class="toast" id="toast"></div>
 
-<script>
-const STORAGE_KEY = 'restock-book-state';
+<script type="module">
+import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
+import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
+import { doc, getFirestore, onSnapshot, setDoc } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyDrXvdFnJYY6zJPdZ2U3tkB9Lm4LDL7M5I',
+  authDomain: 'skm-billing-33a82.firebaseapp.com',
+  projectId: 'skm-billing-33a82',
+  storageBucket: 'skm-billing-33a82.firebasestorage.app',
+  messagingSenderId: '655676809016',
+  appId: '1:655676809016:web:d5d1514b8f752dc37a2bcd'
+};
+
+const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
+const restockRef = doc(db, 'restock', 'shared');
 let state = { pending: [], batches: [], tripCounter: 0 };
 let selectedIds = new Set();
+let currentUser = null;
+let unsubscribeState = null;
 
 function uid(){ return crypto.randomUUID(); }
 
@@ -518,27 +536,30 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'), 1800);
 }
 
-async function loadState(){
-  try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if(res && res.value){
-      state = JSON.parse(res.value);
-      if(!state.pending) state.pending = [];
-      if(!state.batches) state.batches = [];
-      if(typeof state.tripCounter !== 'number') state.tripCounter = state.batches.length;
-    }
-  }catch(e){
-    // key not found yet — first run, keep defaults
-  }
+function normalizeState(nextState){
+  state = nextState || { pending: [], batches: [], tripCounter: 0 };
+  if(!Array.isArray(state.pending)) state.pending = [];
+  if(!Array.isArray(state.batches)) state.batches = [];
+  if(typeof state.tripCounter !== 'number') state.tripCounter = state.batches.length;
+  selectedIds = new Set([...selectedIds].filter(id => state.pending.some(item => item.id === id)));
   render();
 }
 
 async function saveState(){
   try{
-    const result = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
-    if(!result){ showToast('Could not save — try again'); }
+    if(!currentUser){
+      showToast('Please sign in first');
+      return;
+    }
+    await setDoc(restockRef, {
+      pending: state.pending,
+      batches: state.batches,
+      tripCounter: state.tripCounter,
+      updatedAt: new Date().toISOString(),
+      updatedBy: currentUser.uid
+    });
   }catch(e){
-    showToast('Could not save — try again');
+    showToast('Could not save to Firebase');
   }
 }
 
@@ -864,7 +885,21 @@ document.getElementById('modal-overlay').addEventListener('click', (e)=>{
   if(e.target.id === 'modal-overlay') e.currentTarget.classList.add('hidden');
 });
 
-loadState();
+onAuthStateChanged(auth, (user) => {
+  if(!user){
+    window.location.replace('/login');
+    return;
+  }
+
+  currentUser = user;
+  if(unsubscribeState) unsubscribeState();
+  unsubscribeState = onSnapshot(restockRef, (snapshot) => {
+    normalizeState(snapshot.exists() ? snapshot.data() : null);
+  }, (error) => {
+    console.error(error);
+    showToast('Could not load shared restock data');
+  });
+});
 </script>
 </body>
 </html>

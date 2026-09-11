@@ -113,6 +113,41 @@ input[type="number"] { -moz-appearance: textfield; }
 .inv-add-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
 .inv-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 
+/* ── restock callout on homepage ── */
+.restock-callout {
+  background: linear-gradient(135deg, #1f482f 0%, #2d5d3b 45%, #3b6f46 100%);
+  border-radius: 18px; padding: 20px 18px 18px; margin: 8px 0 18px;
+  box-shadow: 0 14px 28px rgba(30, 59, 41, 0.18); color: #f7f5ef;
+}
+.restock-callout-top {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.restock-eyebrow {
+  text-transform: uppercase; letter-spacing: 0.14em; font-size: 10px; opacity: 0.8; margin-bottom: 8px;
+}
+.restock-callout h2 {
+  margin: 0; font-size: clamp(26px, 4vw, 42px); line-height: 1.05; font-weight: 800;
+}
+.restock-callout p {
+  margin: 12px 0 0; font-size: 15px; line-height: 1.6; max-width: 720px; opacity: 0.96;
+}
+.restock-button {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #f7efe1; color: #1f482f; text-decoration: none;
+  border-radius: 999px; padding: 11px 18px; min-height: 42px;
+  font-size: 14px; font-weight: 700; border: 1px solid rgba(255,255,255,0.2);
+}
+.restock-summary-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(100px, 1fr)); gap: 12px; margin-top: 18px;
+}
+.restock-chip {
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px; padding: 12px 10px 10px; display: flex;
+  flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.restock-chip strong { font-size: 22px; }
+.restock-chip span { font-size: 11px; opacity: 0.9; }
+
 /* ── home grid cards ── */
 .home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .home-card {
@@ -127,6 +162,17 @@ input[type="number"] { -moz-appearance: textfield; }
 .hc-name { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.2; }
 .hc-sub  { font-size: 11.5px; color: var(--ink3); font-weight: 500; }
 
+@media (max-width: 700px) {
+  .restock-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .restock-callout { padding: 16px 14px 14px; }
+  .restock-summary-grid { grid-template-columns: 1fr; }
+  .home-grid { grid-template-columns: 1fr; }
+  .home-card { min-height: 96px; }
+}
 /* ── category grid ── */
 .cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px,1fr)); gap: 12px; margin-top: 16px; }
 .cat-card {

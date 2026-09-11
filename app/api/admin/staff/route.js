@@ -31,9 +31,27 @@ function errorResponse(error) {
 
 export async function GET(request) {
   try {
-    const { adminDb } = await requireAdmin(request);
+    const { adminAuth, adminDb } = await requireAdmin(request);
     const snapshot = await adminDb.collection('user').get();
-    const staff = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    const authUsers = [];
+    let nextPageToken;
+    do {
+      const page = await adminAuth.listUsers(1000, nextPageToken);
+      authUsers.push(...page.users);
+      nextPageToken = page.pageToken;
+    } while (nextPageToken);
+    const authById = new Map(authUsers.map((item) => [item.uid, item]));
+    const staff = snapshot.docs.map((item) => {
+      const profile = item.data();
+      const authUser = authById.get(item.id);
+      const emailName = authUser?.email?.split('@')[0] || '';
+      return {
+        id: item.id,
+        ...profile,
+        name: profile.name || authUser?.displayName || emailName || item.id,
+        email: profile.email || authUser?.email || '',
+      };
+    });
     return NextResponse.json({ staff });
   } catch (error) {
     return errorResponse(error);

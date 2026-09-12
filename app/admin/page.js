@@ -264,7 +264,7 @@ export default function AdminPage() {
                       {isNewSection && (
                         <td
                           rowSpan={sectionItems.length}
-                          style={{ ...tdStyle, fontWeight: 700, color: 'var(--primary-dark)', background: '#E8F0E6', verticalAlign: 'middle', textAlign: 'center' }}>
+                          style={{ ...tdStyle, fontWeight: 700, color: 'var(--secondary-dark)', background: 'var(--success-soft)', verticalAlign: 'middle', textAlign: 'center' }}>
                           {item.section}
                         </td>
                       )}

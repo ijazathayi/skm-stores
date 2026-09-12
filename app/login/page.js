@@ -111,12 +111,12 @@ export default function LoginPage() {
 
   return (
     <main style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', padding: 20, background: 'linear-gradient(145deg, #f8f2e7, #e7f0e4)', fontFamily: 'system-ui, sans-serif' }}>
-      <section style={{ width: 'min(410px, 100%)', background: '#fffdf8', border: '1px solid #ded5c7', borderRadius: 20, padding: '32px 28px', boxShadow: '0 18px 48px rgba(62, 77, 54, .16)' }}>
+      <section style={{ width: 'min(410px, 100%)', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 20, padding: '32px 28px', boxShadow: '0 18px 48px rgba(74, 68, 111, .16)' }}>
         <div style={{ display: 'grid', placeItems: 'center', gap: 10, marginBottom: 24 }}>
           <Image src="/skm-logo.png" alt="SKM Stores" width={58} height={58} style={{ borderRadius: 16 }} />
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 25, color: '#244b29' }}>SKM Stores</h1>
-            <p style={{ margin: '5px 0 0', color: '#6b6258', fontSize: 14 }}>Sign in to continue</p>
+            <h1 style={{ margin: 0, fontFamily: 'Georgia, serif', fontSize: 25, color: 'var(--primary-dark)' }}>SKM Stores</h1>
+            <p style={{ margin: '5px 0 0', color: 'var(--ink3)', fontSize: 14 }}>Sign in to continue</p>
           </div>
         </div>
 
@@ -131,11 +131,11 @@ export default function LoginPage() {
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />
           </label>
-          {error && <p style={{ margin: 0, color: '#b42318', fontSize: 13, fontWeight: 600 }}>{error}</p>}
-          <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: 10, padding: '12px 16px', background: '#3b6e44', color: '#fff', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
+          {error && <p style={{ margin: 0, color: 'var(--danger)', fontSize: 13, fontWeight: 600 }}>{error}</p>}
+          <button type="submit" disabled={submitting} style={{ border: 0, borderRadius: 10, padding: '12px 16px', background: 'linear-gradient(135deg, var(--primary), var(--accent))', color: '#fff', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>
-          <button type="button" onClick={signInWithFingerprint} disabled={submitting} style={{ border: '1px solid #3b6e44', borderRadius: 10, padding: '11px 16px', background: '#fffdf8', color: '#28582f', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
+          <button type="button" onClick={signInWithFingerprint} disabled={submitting} style={{ border: '1px solid var(--secondary)', borderRadius: 10, padding: '11px 16px', background: '#F1FBF8', color: 'var(--secondary-dark)', fontWeight: 700, cursor: submitting ? 'wait' : 'pointer', opacity: submitting ? .65 : 1 }}>
             🫆 Sign in with fingerprint
           </button>
         </form>
@@ -144,5 +144,5 @@ export default function LoginPage() {
   );
 }
 
-const labelStyle = { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: '#4f4b43' };
-const inputStyle = { width: '100%', boxSizing: 'border-box', border: '1px solid #cfc7bb', borderRadius: 9, padding: '11px 12px', background: '#fff', fontSize: 15, color: '#24211d' };
+const labelStyle = { display: 'grid', gap: 6, fontSize: 13, fontWeight: 700, color: 'var(--ink2)' };
+const inputStyle = { width: '100%', boxSizing: 'border-box', border: '1px solid var(--border)', borderRadius: 9, padding: '11px 12px', background: 'var(--paper)', fontSize: 15, color: 'var(--ink)' };

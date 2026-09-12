@@ -44,7 +44,7 @@ export default function Header({ backHref, title, showLangToggle = true }) {
               <div style={{ fontSize: 12, color: 'var(--ink3)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',
-                  background: connected ? '#3B8A46' : 'var(--danger)',
+                  background: connected ? 'var(--success)' : 'var(--danger)',
                   display: 'inline-block'
                 }} />
                 {connected ? t('syncedLive', lang) : t('offline', lang)}

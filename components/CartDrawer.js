@@ -71,7 +71,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, flex: 1 }}>
                     <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', flex: 1 }}>{displayName}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary-dark)', background: '#E8F0E6', borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--secondary-dark)', background: 'var(--success-soft)', borderRadius: 5, padding: '3px 7px', whiteSpace: 'nowrap' }}>
                       {isTa ? (c.unit === 'kg' ? 'கிலோ' : (c.unit === 'pcs' ? 'எண்ணிக்கை' : c.unit)) : c.unit}
                     </span>
                   </div>
@@ -116,7 +116,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
                         style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: 15, color: 'var(--ink)', padding: 0, height: 40 }} />
                     </div>
                     {Number(qtyDisplay) > 0 && (
-                      <span style={{ fontSize: 12, color: 'var(--primary-dark)', fontWeight: 600, background: '#E8F0E6', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 12, color: 'var(--secondary-dark)', fontWeight: 600, background: 'var(--success-soft)', borderRadius: 6, padding: '3px 8px', whiteSpace: 'nowrap' }}>
                         ≈ {(Number(qtyDisplay) * 1000).toFixed(0)} {isTa ? 'கிராம்' : 'g'}
                       </span>
                     )}

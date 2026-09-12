@@ -110,7 +110,7 @@ export default function SettingsPage() {
       <main className="wrap">
         {saved && (
           <div style={{
-            background: saved.startsWith('❌') ? '#fdecea' : '#E8F0E6',
+            background: saved.startsWith('❌') ? '#FDECEF' : 'var(--success-soft)',
             color: saved.startsWith('❌') ? 'var(--danger)' : 'var(--primary-dark)',
             borderRadius: 8, padding: '10px 16px', marginBottom: 16, fontWeight: 700,
           }}>

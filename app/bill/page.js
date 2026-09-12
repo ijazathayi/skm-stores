@@ -95,7 +95,7 @@ export default function BillPage() {
                     onClick={() => { addToCart(isVeg ? null : m.id, m.name, isVeg ? m.id : null); setSearch(''); }}>
                     <span style={{ fontWeight: 600 }}>{displayName}</span>
                     {m.price && <span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--ink3)' }}>₹{Number(m.price).toFixed(2)}</span>}
-                    {isVeg && <span style={{ marginLeft: 6, fontSize: 10.5, color: '#5a9a5a', fontWeight: 700 }}>{isTa ? 'இன்றைய விலை' : "Today's price"}</span>}
+                    {isVeg && <span style={{ marginLeft: 6, fontSize: 10.5, color: 'var(--success)', fontWeight: 700 }}>{isTa ? 'இன்றைய விலை' : "Today's price"}</span>}
                   </button>
                 );
               })}
@@ -155,7 +155,7 @@ export default function BillPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, width: '100%' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.25, wordBreak: 'break-word' }}>{displayName}</div>
-                        {isVeg && <div style={{ fontSize: 10, color: '#5a9a5a', fontWeight: 600 }}>{isTa ? 'இன்றைய விலை' : "Today's price"}</div>}
+                        {isVeg && <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600 }}>{isTa ? 'இன்றைய விலை' : "Today's price"}</div>}
                       </div>
                       <div style={{ flexShrink: 0 }}>
                         {inCart ? <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 700 }}>✓</span>
@@ -164,7 +164,7 @@ export default function BillPage() {
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 4, width: '100%' }}>
                       {m.price
-                        ? <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary-dark)', background: inCart ? '#D6E8D3' : '#F1F0E4', padding: '2px 7px', borderRadius: 5 }}>₹{Number(m.price).toFixed(0)}</span>
+                        ? <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--secondary-dark)', background: inCart ? 'var(--success-soft)' : '#FFF4D9', padding: '2px 7px', borderRadius: 5 }}>₹{Number(m.price).toFixed(0)}</span>
                         : <span style={{ fontSize: 11, color: 'var(--ink3)' }}>—</span>}
                     </div>
                   </button>

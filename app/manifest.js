@@ -5,8 +5,8 @@ export default function manifest() {
     description: 'Billing and inventory for SKM Stores',
     start_url: '/',
     display: 'standalone',
-    background_color: '#F1F0E4',
-    theme_color: '#F1F0E4',
+    background_color: '#FFF4D9',
+    theme_color: '#D9466F',
     icons: [
       {
         src: '/skm-logo.png',

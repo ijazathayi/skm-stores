@@ -223,8 +223,8 @@ export default function InventoryPage() {
         {/* ── Import message / preview ── */}
         {importMsg && (
           <div style={{
-            background: importMsg.startsWith('❌') ? '#fdecea' : '#E8F0E6',
-            color: importMsg.startsWith('❌') ? 'var(--danger)' : 'var(--primary-dark)',
+            background: importMsg.startsWith('❌') ? '#FDECEF' : 'var(--success-soft)',
+            color: importMsg.startsWith('❌') ? 'var(--danger)' : 'var(--secondary-dark)',
             borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, fontWeight: 600,
           }}>
             {importMsg}
@@ -234,7 +234,7 @@ export default function InventoryPage() {
         {importPreview && (
           <section style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
-            background: '#F1F0E4', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 14,
+            background: '#FFF4D9', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', marginBottom: 14,
           }}>
             <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
               <strong style={{ color: 'var(--ink)' }}>{isTa ? 'இறக்குமதிக்கு தயாராக உள்ளது' : 'Ready to import'}</strong>
@@ -332,11 +332,11 @@ export default function InventoryPage() {
                         ? <span style={{ background: 'var(--primary)', color: '#fff', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>₹{Number(p.price).toFixed(2)}</span>
                         : <span style={{ color: 'var(--ink3)', fontSize: 11 }}>{isTa ? 'விலை இல்லை' : 'No price'}</span>
                       }
-                      <span style={{ background: '#E8F0E6', color: 'var(--primary-dark)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                      <span style={{ background: 'var(--success-soft)', color: 'var(--secondary-dark)', padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
                         {isTa ? (p.unit === 'kg' ? 'கிலோ' : (p.unit === 'pcs' ? 'எண்ணிக்கை' : 'இரண்டும்')) : (p.unit || 'both')}
                       </span>
                       {cat && (
-                        <span style={{ background: '#F1F0E4', color: 'var(--ink2)', padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
+                        <span style={{ background: '#FFF4D9', color: 'var(--ink2)', padding: '2px 7px', borderRadius: 6, fontSize: 11, fontWeight: 600 }}>
                           {cat.icon} {isTa && cat.labelTa ? cat.labelTa : cat.label}
                         </span>
                       )}

@@ -6,6 +6,7 @@ import { money } from '@/lib/helpers';
 import { printReceipt } from '@/lib/printReceipt';
 import { getProductName } from '@/lib/translations';
 import { useAuth } from '@/components/AuthProvider';
+import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
 
 /* Group bills array into { "Sunday, 6 Sep 2026": [bill, …], … } */
 function groupByDate(bills, isTa) {
@@ -29,6 +30,20 @@ export default function HistoryPage() {
   const printBill = (b) => {
     if (typeof window !== 'undefined') {
       printReceipt(b, storeProfile, { lang });
+    }
+  };
+
+  const printBillBluetooth = async (bill) => {
+    if (!supportsBluetoothPrinting()) {
+      alert(isTa ? 'இந்த உலாவியில் Bluetooth அச்சிடுதல் இல்லை.' : 'Bluetooth printing is not supported in this browser.');
+      return;
+    }
+    try {
+      await printReceiptBluetooth(bill, storeProfile);
+    } catch (error) {
+      if (error.name !== 'NotFoundError') {
+        alert(isTa ? `Bluetooth அச்சிடுதல் தோல்வி: ${error.message}` : `Bluetooth printing failed: ${error.message}`);
+      }
     }
   };
 
@@ -85,6 +100,7 @@ export default function HistoryPage() {
                           <span style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 700, color: 'var(--primary-dark)' }}>
                             {money(b.total)}
                           </span>
+                          <button className="icon-btn" title={isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Print via Bluetooth'} onClick={() => printBillBluetooth(b)}>📡</button>
                           <button className="icon-btn" onClick={() => printBill(b)}>🖨</button>
                           <button className="icon-btn" title={isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'} onClick={() => startEdit(b)}>✏️</button>
                           {role === 'admin' && <button className="icon-btn" title="Delete sale" onClick={() => { if (window.confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>}

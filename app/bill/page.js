@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
 import { printReceipt } from '@/lib/printReceipt';
+import { printReceiptBluetooth } from '@/lib/bluetoothPrinter';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
 
@@ -55,11 +56,18 @@ export default function BillPage() {
     ? vegPrices.filter((v) => matchesSearch(v, search) && !cart.some((c) => c._vegId === v.id))
     : [];
 
-  const handleComplete = (bill) => {
+  const handleComplete = async (bill) => {
     setLastBill(bill);
     setDrawerOpen(false);
     if (typeof window !== 'undefined') {
-      printReceipt(bill, storeProfile, { lang });
+      try {
+        await printReceiptBluetooth(bill, storeProfile);
+      } catch (error) {
+        if (error.name !== 'NotFoundError' && error.name !== 'NotAllowedError') {
+          console.warn('Bluetooth printing unavailable, using system print:', error);
+        }
+        printReceipt(bill, storeProfile, { lang });
+      }
     }
   };
 

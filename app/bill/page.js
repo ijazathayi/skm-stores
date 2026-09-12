@@ -59,14 +59,24 @@ export default function BillPage() {
   const handleComplete = async (bill) => {
     setLastBill(bill);
     setDrawerOpen(false);
-    if (typeof window !== 'undefined') {
-      try {
-        await printReceiptBluetooth(bill, storeProfile, { lang });
-      } catch (error) {
-        if (error.name !== 'NotFoundError' && error.name !== 'NotAllowedError') {
-          console.warn('Bluetooth printing unavailable, using system print:', error);
-        }
-        printReceipt(bill, storeProfile, { lang });
+  };
+
+  const handleEditLastBill = () => {
+    editBill(lastBill);
+    setLastBill(null);
+    setDrawerOpen(true);
+  };
+
+  const handleBluetoothPrint = async () => {
+    if (!supportsBluetoothPrinting()) {
+      alert(isTa ? 'இந்த உலாவியில் Bluetooth அச்சிடுதல் இல்லை.' : 'Bluetooth printing is not supported in this browser.');
+      return;
+    }
+    try {
+      await printReceiptBluetooth(lastBill, storeProfile, { lang });
+    } catch (error) {
+      if (error.name !== 'NotFoundError' && error.name !== 'NotAllowedError') {
+        alert(isTa ? `Bluetooth அச்சிடுதல் தோல்வி: ${error.message}` : `Bluetooth printing failed: ${error.message}`);
       }
     }
   };
@@ -191,6 +201,34 @@ export default function BillPage() {
         🛒
         {cart.length > 0 && <span className="cart-fab-badge">{cart.length}</span>}
       </button>
+
+      {lastBill && (
+        <div className="drawer-overlay" onClick={() => setLastBill(null)}>
+          <div className="bill-card" onClick={(event) => event.stopPropagation()} style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(420px, calc(100% - 32px))', zIndex: 20, margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{isTa ? 'ரசீது தயார்' : 'Bill ready'}</div>
+                <div style={{ color: 'var(--ink3)', fontSize: 13, marginTop: 3 }}>#{lastBill.billNo} · {money(lastBill.total)}</div>
+              </div>
+              <button className="drawer-close" onClick={() => setLastBill(null)}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gap: 8 }}>
+              <button className="btn-primary" onClick={() => printReceipt(lastBill, storeProfile, { lang })}>
+                🖨 {isTa ? 'சாதாரணமாக அச்சிடு' : 'Print bill'}
+              </button>
+              <button className="btn-secondary" onClick={handleBluetoothPrint}>
+                📡 {isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Bluetooth print'}
+              </button>
+              <button className="btn-secondary" onClick={handleEditLastBill}>
+                ✏️ {isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'}
+              </button>
+              <button className="btn-secondary" onClick={() => setLastBill(null)}>
+                {isTa ? 'முடிந்தது' : 'Finish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cart Drawer */}
       <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onComplete={handleComplete} />

@@ -64,6 +64,14 @@ input[type="number"] { -moz-appearance: textfield; }
 .btn-primary:active { background: var(--primary-dark); transform: scale(0.98); }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--border); border-radius: 10px;
+  padding: 13px 18px; font-size: 15px; font-weight: 700; cursor: pointer; min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-secondary:active { background: var(--success-soft); transform: scale(0.98); }
+
 .icon-btn {
   background: transparent; border: none; color: var(--ink3); padding: 0;
   border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center;

@@ -154,7 +154,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
               ? (isTa ? 'சேமிக்கப்படுகிறது…' : 'Saving…')
               : editingBill
                 ? (isTa ? 'மாற்றங்களைச் சேமிக்க' : 'Save changes')
-                : (isTa ? 'விற்பனையை முடிக்க' : 'Complete sale')}
+                : (isTa ? 'ரசீதைக் காட்டு' : 'Show bill')}
           </button>
         </div>
       </div>

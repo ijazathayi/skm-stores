@@ -61,7 +61,7 @@ export default function BillPage() {
     setDrawerOpen(false);
     if (typeof window !== 'undefined') {
       try {
-        await printReceiptBluetooth(bill, storeProfile);
+        await printReceiptBluetooth(bill, storeProfile, { lang });
       } catch (error) {
         if (error.name !== 'NotFoundError' && error.name !== 'NotAllowedError') {
           console.warn('Bluetooth printing unavailable, using system print:', error);

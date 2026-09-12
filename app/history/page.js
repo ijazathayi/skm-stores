@@ -39,7 +39,7 @@ export default function HistoryPage() {
       return;
     }
     try {
-      await printReceiptBluetooth(bill, storeProfile);
+      await printReceiptBluetooth(bill, storeProfile, { lang });
     } catch (error) {
       if (error.name !== 'NotFoundError') {
         alert(isTa ? `Bluetooth அச்சிடுதல் தோல்வி: ${error.message}` : `Bluetooth printing failed: ${error.message}`);

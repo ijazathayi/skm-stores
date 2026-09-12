@@ -1,7 +1,6 @@
 'use client';
-import { useEffect, useCallback, useState } from 'react';
+import { Fragment, useEffect, useCallback, useState } from 'react';
 import Link from 'next/link';
-import Script from 'next/script';
 import { useStore } from '@/lib/store';
 
 /* ─────────────────────────────────────────────
@@ -219,8 +218,7 @@ export default function BuyMilk() {
 
   /* ── canvas / download / share ── */
   const generateCanvas = useCallback(async () => {
-    const html2canvas = window.html2canvas;
-    if (!html2canvas) throw new Error('html2canvas not loaded');
+    const { default: html2canvas } = await import('html2canvas');
 
     const billWrapper = document.getElementById('bm-bill-wrapper');
     if (!billWrapper) throw new Error('Bill wrapper not found');
@@ -232,38 +230,49 @@ export default function BuyMilk() {
     wrapperClone.style.top      = '-9999px';
     document.body.appendChild(wrapperClone);
 
-    const tableClone  = wrapperClone.querySelector('#bm-myTable');
-    const origInputs  = billWrapper.querySelectorAll('.bm-peices-inps');
-    const cloneInputs = wrapperClone.querySelectorAll('.bm-peices-inps');
+    try {
+      const tableClone  = wrapperClone.querySelector('#bm-myTable');
+      const origInputs  = billWrapper.querySelectorAll('.bm-peices-inps');
+      const cloneInputs = wrapperClone.querySelectorAll('.bm-peices-inps');
 
-    origInputs.forEach((input, i) => {
-      const span           = document.createElement('span');
-      span.textContent     = input.value;
-      span.style.display   = 'block';
-      span.style.textAlign = 'center';
-      cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
-    });
+      origInputs.forEach((input, i) => {
+        const span           = document.createElement('span');
+        span.textContent     = input.value;
+        span.style.display   = 'block';
+        span.style.textAlign = 'center';
+        cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
+      });
 
-    // Keep the app table complete, but create a concise customer-facing image.
-    tableClone.querySelector('[data-milk-export-columns]')?.deleteCell(1);
-    tableClone.querySelectorAll('[data-milk-export-section]').forEach((header) => {
-      header.colSpan = 4;
-    });
-    tableClone.querySelectorAll('[data-milk-export-item]').forEach((row) => {
-      if (Number(row.dataset.total) === 0) {
-        row.remove();
-      } else {
-        row.deleteCell(1);
-      }
-    });
-    const grandTotalRow = tableClone.querySelector('[data-milk-export-grand-total]');
-    if (grandTotalRow) grandTotalRow.cells[0].colSpan = 2;
+      // Keep the app table complete, but create a concise customer-facing image.
+      tableClone.querySelector('[data-milk-export-columns]')?.deleteCell(1);
+      tableClone.querySelectorAll('[data-milk-export-section]').forEach((header) => {
+        header.colSpan = 4;
+        const sectionRow = header.parentElement;
+        let hasItems = false;
+        let nextRow = sectionRow?.nextElementSibling;
+        while (nextRow && !nextRow.querySelector('[data-milk-export-section]')) {
+          if (nextRow.matches('[data-milk-export-item]') && Number(nextRow.dataset.total) !== 0) {
+            hasItems = true;
+            break;
+          }
+          nextRow = nextRow.nextElementSibling;
+        }
+        if (!hasItems) sectionRow.remove();
+      });
+      tableClone.querySelectorAll('[data-milk-export-item]').forEach((row) => {
+        if (Number(row.dataset.total) === 0) {
+          row.remove();
+        } else {
+          row.deleteCell(1);
+        }
+      });
+      const grandTotalRow = tableClone.querySelector('[data-milk-export-grand-total]');
+      if (grandTotalRow) grandTotalRow.cells[0].colSpan = 2;
 
-    const h2c = typeof window !== 'undefined' ? window.html2canvas : null;
-    if (!h2c) throw new Error('html2canvas not loaded');
-    const canvas = await h2c(wrapperClone, { backgroundColor: '#ffffff', scale: 2 });
-    document.body.removeChild(wrapperClone);
-    return canvas;
+      return await html2canvas(wrapperClone, { backgroundColor: '#ffffff', scale: 2 });
+    } finally {
+      wrapperClone.remove();
+    }
   }, []);
 
   const downloadTableImage = useCallback(async () => {
@@ -325,10 +334,6 @@ export default function BuyMilk() {
   return (
     <>
       <style>{CSS}</style>
-      <Script
-        src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
-        strategy="lazyOnload"
-      />
 
       <div className="bm-root">
         <Link href="/" className="bm-back">← {isTa ? 'முகப்பு' : 'Back'}</Link>
@@ -356,8 +361,10 @@ export default function BuyMilk() {
                 </tr>
 
                 {Object.entries(sections).map(([section, items]) => (
-                  <tr key={`wrap-${section}`} style={{ display: 'contents' }}>
-                    <th data-milk-export-section colSpan="5" style={{ background: '#0056b3', color: '#fff' }}>{getSectionTitle(section)}</th>
+                  <Fragment key={section}>
+                    <tr>
+                      <th data-milk-export-section colSpan="5" style={{ background: '#0056b3', color: '#fff' }}>{getSectionTitle(section)}</th>
+                    </tr>
                     {items.map((item) => (
                       <tr key={item.key} data-milk-export-item data-total={totals[item.key] || 0}>
                         <td>{getItemLabel(item)}</td>
@@ -376,7 +383,7 @@ export default function BuyMilk() {
                         <td>₹{(totals[item.key] || 0).toFixed(2)}</td>
                       </tr>
                     ))}
-                  </tr>
+                  </Fragment>
                 ))}
 
                 {/* Grand total */}

@@ -4,12 +4,12 @@ import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
 import { printReceipt } from '@/lib/printReceipt';
-import { printReceiptBluetooth } from '@/lib/bluetoothPrinter';
+import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
 
 export default function BillPage() {
-  const { inventory, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang } = useStore();
+  const { inventory, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill } = useStore();
   const isTa = lang === 'ta';
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -203,14 +203,52 @@ export default function BillPage() {
       </button>
 
       {lastBill && (
-        <div className="drawer-overlay" onClick={() => setLastBill(null)}>
-          <div className="bill-card" onClick={(event) => event.stopPropagation()} style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(420px, calc(100% - 32px))', zIndex: 20, margin: 0 }}>
+        <div className="drawer-overlay">
+          <div className="bill-card" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(520px, calc(100% - 32px))', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', zIndex: 20, margin: 0 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
               <div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{isTa ? 'ரசீது தயார்' : 'Bill ready'}</div>
-                <div style={{ color: 'var(--ink3)', fontSize: 13, marginTop: 3 }}>#{lastBill.billNo} · {money(lastBill.total)}</div>
+                <div style={{ color: 'var(--ink3)', fontSize: 13, marginTop: 3 }}>{isTa ? 'ரசீது எண்' : 'Bill No'}: #{lastBill.billNo}</div>
               </div>
               <button className="drawer-close" onClick={() => setLastBill(null)}>✕</button>
+            </div>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 390 }}>
+                <thead>
+                  <tr style={{ background: 'var(--paper)', color: 'var(--ink3)', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 7px' }}>#</th>
+                    <th style={{ padding: '8px 7px' }}>{isTa ? 'பொருள்' : 'Item'}</th>
+                    <th style={{ padding: '8px 7px', textAlign: 'right' }}>{isTa ? 'அளவு' : 'Qty'}</th>
+                    <th style={{ padding: '8px 7px', textAlign: 'right' }}>{isTa ? 'ஒரு அலகு விலை' : 'Rate'}</th>
+                    <th style={{ padding: '8px 7px', textAlign: 'right' }}>{isTa ? 'தொகை' : 'Amount'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(lastBill.items || []).map((item, index) => {
+                    const amount = (Number(item.qty) || 0) * (Number(item.price) || 0);
+                    const unit = item.unit === 'kg' ? 'kg' : 'pc';
+                    return (
+                      <tr key={`${item.name}-${index}`} style={{ borderTop: '1px solid var(--border)' }}>
+                        <td style={{ padding: '8px 7px', color: 'var(--ink3)' }}>{index + 1}</td>
+                        <td style={{ padding: '8px 7px', fontWeight: 600 }}>{getProductName(item, lang)}</td>
+                        <td style={{ padding: '8px 7px', textAlign: 'right', whiteSpace: 'nowrap' }}>{item.qty} {unit}</td>
+                        <td style={{ padding: '8px 7px', textAlign: 'right', whiteSpace: 'nowrap' }}>{money(item.price)} / {unit}</td>
+                        <td style={{ padding: '8px 7px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{money(amount)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 8, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink3)', marginBottom: 5 }}>
+                <span>{isTa ? 'ரவுண்டு ஆஃப்' : 'Round off'}</span>
+                <span>{lastBill.roundOff > 0 ? '+' : ''}{money(lastBill.roundOff)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 800 }}>
+                <span>{isTa ? 'மொத்தம்' : 'Total'}</span>
+                <span style={{ color: 'var(--primary-dark)' }}>{money(lastBill.total)}</span>
+              </div>
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
               <button className="btn-primary" onClick={() => printReceipt(lastBill, storeProfile, { lang })}>

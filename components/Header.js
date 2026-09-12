@@ -28,11 +28,11 @@ export default function Header({ backHref, title, showLangToggle = true }) {
           </Link>
         ) : (
           <div style={{
-            width: 40, height: 40, borderRadius: 10, background: 'var(--card)',
+            width: 50, height: 50, borderRadius: 12, background: 'var(--card)',
             border: '1px solid var(--border)', display: 'flex', alignItems: 'center',
             justifyContent: 'center', overflow: 'hidden', flexShrink: 0
           }}>
-            <Image src="/skm-logo.png" alt="SKM Stores" width={40} height={40} style={{ objectFit: 'cover' }} />
+            <Image src="/skm-logo.png" alt="SKM Stores" width={50} height={50} style={{ objectFit: 'cover' }} />
           </div>
         )}
         <div>
@@ -40,7 +40,7 @@ export default function Header({ backHref, title, showLangToggle = true }) {
             <div style={{ fontFamily: 'Georgia, serif', fontSize: 17, fontWeight: 700 }}>{title}</div>
           ) : (
             <>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: 19, fontWeight: 700 }}>{t('appName', lang)}</div>
+              <div className="home-brand-name" style={{ fontFamily: 'Georgia, serif', fontSize: 24, fontWeight: 900 }}>{t('appName', lang)}</div>
               <div style={{ fontSize: 12, color: 'var(--ink3)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
                   width: 7, height: 7, borderRadius: '50%',

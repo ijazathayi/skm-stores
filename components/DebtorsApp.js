@@ -33,9 +33,10 @@ function hasMobile(mobile) {
 }
 
 export default function DebtorsApp({ customerId = null }) {
-  const { lang } = useStore();
+  const { lang, storeProfile } = useStore();
   const { role } = useAuth();
   const isTa = lang === 'ta';
+  const messageIsTa = (storeProfile?.messageLang || (typeof window !== 'undefined' ? localStorage.getItem('skm_messageLang') : 'en')) === 'ta';
   const isAdmin = role === 'admin';
   const [customers, setCustomers] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -302,7 +303,7 @@ export default function DebtorsApp({ customerId = null }) {
   function getMessageDetails() {
     if (!currentCustomer) return;
     const bal = getCustomerBalance(currentCustomer.id);
-    const text = isTa
+    const text = messageIsTa
       ? `வணக்கம் ${currentCustomer.name},\nஎஸ்.கே.எம் ஸ்டோர்ஸில் உங்கள் கடன் நிலுவை தொகை: ${money(bal)}.\nதயவுசெய்து விரைவில் செலுத்தவும். நன்றி!`
       : `Hello ${currentCustomer.name},\nYour outstanding balance at SKM Stores is ${money(bal)}.\nPlease clear it at your earliest convenience. Thank you!`;
     const cleanMobile = String(currentCustomer.mobile || '').replace(/[^0-9]/g, '');

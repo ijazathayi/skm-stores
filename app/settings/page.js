@@ -19,6 +19,7 @@ export default function SettingsPage() {
   // ── print / lang settings ──
   const [printWidth, setPrintWidth] = useState(58);
   const [printLang,  setPrintLang]  = useState('en');
+  const [messageLang, setMessageLang] = useState('en');
 
   // ── password fields ──
   const [curPwd, setCurPwd] = useState('');
@@ -38,6 +39,10 @@ export default function SettingsPage() {
         setPrintLang(storeProfile.printLang);
         if (typeof window !== 'undefined') localStorage.setItem('skm_printLang', storeProfile.printLang);
       }
+      if (storeProfile.messageLang) {
+        setMessageLang(storeProfile.messageLang);
+        if (typeof window !== 'undefined') localStorage.setItem('skm_messageLang', storeProfile.messageLang);
+      }
       if (storeProfile.printWidth) {
         setPrintWidth(Number(storeProfile.printWidth));
         if (typeof window !== 'undefined') localStorage.setItem('skm_printWidth', storeProfile.printWidth);
@@ -49,8 +54,10 @@ export default function SettingsPage() {
   useEffect(() => {
     const savedWidth = Number(LS('skm_printWidth', '58')) || 58;
     const savedLang = LS('skm_lang', LS('skm_printLang', 'en'));
+    const savedMessageLang = LS('skm_messageLang', 'en');
     setPrintWidth(savedWidth);
     setPrintLang(savedLang);
+    setMessageLang(savedMessageLang);
   }, []);
 
   const flash = (msg) => { setSaved(msg); setTimeout(() => setSaved(''), 3000); };
@@ -64,7 +71,8 @@ export default function SettingsPage() {
         storeAddress: storeAddress.trim(),
         receiptFooter: receiptFooter.trim() || (isTa ? 'நன்றி மீண்டும் வருக!' : 'THANK YOU VISIT AGAIN'),
         printWidth,
-        printLang
+        printLang,
+        messageLang
       });
       flash(isTa ? '✓ கடை விவரங்கள் சேமிக்கப்பட்டன!' : '✓ Store profile saved to cloud!');
     } catch (err) {
@@ -91,6 +99,17 @@ export default function SettingsPage() {
     setPrintLang(l);
     setLang(l);
     flash(l === 'ta' ? '✓ மொழி: தமிழ் (Tamil) மாற்றப்பட்டது!' : '✓ Language set to English!');
+  };
+
+  const changeMessageLang = async (l) => {
+    setMessageLang(l);
+    if (typeof window !== 'undefined') localStorage.setItem('skm_messageLang', l);
+    try {
+      await updateStoreProfile({ messageLang: l });
+      flash(l === 'ta' ? '✓ Debtor messages will be sent in Tamil!' : '✓ Debtor messages will be sent in English!');
+    } catch (err) {
+      flash(isTa ? '❌ சேமிப்பதில் பிழை: ' + err.message : '❌ Could not save message language: ' + err.message);
+    }
   };
 
   /* ── Admin password (localStorage only) ── */
@@ -183,6 +202,23 @@ export default function SettingsPage() {
                   color: (lang || printLang) === l ? '#fff' : 'var(--ink3)',
                 }}>{name}</button>
               ))}
+            </div>
+          </div>
+          <div className="setting-field message-language-setting">
+            <label>{isTa ? 'கடன் செய்தி மொழி' : 'Debtor Message Language'}</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <div style={{ display: 'inline-flex', border: '1.5px solid var(--primary)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
+                {['en', 'ta'].map((value) => (
+                  <button key={value} onClick={() => changeMessageLang(value)} style={{
+                    border: 'none', padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    background: messageLang === value ? 'var(--primary)' : 'transparent',
+                    color: messageLang === value ? '#fff' : 'var(--ink3)',
+                  }}>{value === 'ta' ? 'தமிழ்' : 'English'}</button>
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>
+                {isTa ? 'SMS மற்றும் WhatsApp கடன் செய்திகள்' : 'SMS and WhatsApp debtor messages'}
+              </span>
             </div>
           </div>
         </div>

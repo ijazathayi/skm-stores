@@ -299,8 +299,7 @@ export default function DebtorsApp() {
     }
   }
 
-  /* ── WhatsApp share ── */
-  function shareWhatsApp() {
+  function getMessageDetails() {
     if (!currentCustomer) return;
     const bal = getCustomerBalance(currentCustomer.id);
     const text = isTa
@@ -309,10 +308,23 @@ export default function DebtorsApp() {
     const cleanMobile = String(currentCustomer.mobile || '').replace(/[^0-9]/g, '');
     if (!cleanMobile) {
       alert(isTa ? 'இந்த வாடிக்கையாளரின் அலைபேசி எண் பதிவு செய்யப்படவில்லை.' : 'This customer does not have a registered mobile number.');
-      return;
+      return null;
     }
-    const url = `https://wa.me/${cleanMobile.startsWith('91') ? cleanMobile : '91' + cleanMobile}?text=${encodeURIComponent(text)}`;
+    const mobile = cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile.replace(/^0+/, '')}`;
+    return { mobile, text };
+  }
+
+  function shareWhatsApp() {
+    const details = getMessageDetails();
+    if (!details) return;
+    const url = `https://wa.me/${details.mobile}?text=${encodeURIComponent(details.text)}`;
     window.open(url, '_blank');
+  }
+
+  function sendSms() {
+    const details = getMessageDetails();
+    if (!details) return;
+    window.open(`sms:+${details.mobile}?body=${encodeURIComponent(details.text)}`, '_self');
   }
 
   /* ── Ledger calculations ── */
@@ -523,6 +535,15 @@ export default function DebtorsApp() {
                       {money(customerBalance)}
                     </p>
                   </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 14 }}>
+                  <button type="button" onClick={sendSms} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...brandBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
+                    {isTa ? '✉️ SMS அனுப்பு' : '✉️ Send SMS'}
+                  </button>
+                  <button type="button" onClick={shareWhatsApp} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...softStrongBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
+                    {isTa ? '💬 WhatsApp அனுப்பு' : '💬 Send WhatsApp'}
+                  </button>
                 </div>
 
                 {isEditingCustomer ? (

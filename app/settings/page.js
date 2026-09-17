@@ -206,8 +206,8 @@ export default function SettingsPage() {
           </div>
           <div className="setting-field message-language-setting">
             <label>{isTa ? 'கடன் செய்தி மொழி' : 'Debtor Message Language'}</label>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ display: 'inline-flex', border: '1.5px solid var(--primary)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
+            <div className="language-setting-row">
+              <div className="language-segmented-control" style={{ display: 'inline-flex', border: '1.5px solid var(--primary)', borderRadius: 999, background: 'var(--paper)', overflow: 'hidden' }}>
                 {['en', 'ta'].map((value) => (
                   <button key={value} onClick={() => changeMessageLang(value)} style={{
                     border: 'none', padding: '8px 20px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -216,7 +216,7 @@ export default function SettingsPage() {
                   }}>{value === 'ta' ? 'தமிழ்' : 'English'}</button>
                 ))}
               </div>
-              <span style={{ fontSize: 12, color: 'var(--ink3)' }}>
+              <span className="language-setting-help" style={{ fontSize: 12, color: 'var(--ink3)' }}>
                 {isTa ? 'SMS மற்றும் WhatsApp கடன் செய்திகள்' : 'SMS and WhatsApp debtor messages'}
               </span>
             </div>

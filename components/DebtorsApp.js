@@ -471,10 +471,10 @@ export default function DebtorsApp() {
         </div>}
 
         {/* Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
+        <div className={`debtors-layout${selectedId ? ' has-selection' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
 
           {/* Left: customer list */}
-          <section style={cardStyle}>
+          <section className="debtors-customer-list" style={cardStyle}>
             <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>
               {isTa ? 'வாடிக்கையாளர்கள்' : 'Customers'}
             </h2>
@@ -518,11 +518,14 @@ export default function DebtorsApp() {
           </section>
 
           {/* Right: detail */}
-          <section style={cardStyle}>
+          <section className="debtors-detail" style={cardStyle}>
             {!currentCustomer ? (
               <p style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>Select a customer to see their ledger.</p>
             ) : (
               <>
+                <button type="button" className="debtors-back-button" onClick={() => setSelectedId(null)} style={secondaryBtn}>
+                  ← {isTa ? 'வாடிக்கையாளர்களுக்குத் திரும்பு' : 'Back to customers'}
+                </button>
                 {/* Detail head */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div>

@@ -91,6 +91,17 @@ input[type="number"] { -moz-appearance: textfield; }
   border-radius: 10px; padding: 12px 16px; margin-bottom: 8px;
 }
 
+.debtors-back-button { display: none; }
+
+@media (max-width: 700px) {
+  .debtors-layout { display: block !important; }
+  .debtors-customer-list { display: block; }
+  .debtors-detail { display: none; }
+  .debtors-layout.has-selection .debtors-customer-list { display: none; }
+  .debtors-layout.has-selection .debtors-detail { display: block; }
+  .debtors-back-button { display: inline-flex; margin-bottom: 14px; }
+}
+
 /* ── search ── */
 .search-wrap { position: relative; margin-bottom: 14px; }
 .search-row {

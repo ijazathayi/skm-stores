@@ -338,17 +338,16 @@ export default function DebtorsApp({ customerId = null }) {
   }, { running: 0, rows: [] }).rows;
 
   return (
-    <div style={{
+    <div className="debtor-shell" style={{
       minHeight: '100dvh', background: 'linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%)',
       color: '#3a2415', fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
 
-      {/* Glow blobs */}
-      <div style={{ position: 'fixed', width: 520, height: 520, right: -140, top: -140, background: 'rgba(224,163,37,.45)', borderRadius: '50%', filter: 'blur(90px)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', width: 480, height: 480, left: -140, bottom: -160, background: 'rgba(226,120,110,.35)', borderRadius: '50%', filter: 'blur(90px)', pointerEvents: 'none', zIndex: 0 }} />
+      <div className="debtor-glow debtor-glow-top" />
+      <div className="debtor-glow debtor-glow-bottom" />
 
       {/* Topbar */}
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '20px clamp(16px,4vw,40px)', position: 'relative', zIndex: 1 }}>
+      <header className="debtor-topbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', padding: '20px clamp(16px,4vw,40px)', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div style={{
             width: 44, height: 44, borderRadius: 14, overflow: 'hidden',
@@ -372,10 +371,10 @@ export default function DebtorsApp({ customerId = null }) {
         </div>
       </header>
 
-      <main style={{ padding: '0 clamp(16px,4vw,40px) 56px', maxWidth: 1240, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+      <main className="debtor-main" style={{ padding: '0 clamp(16px,4vw,40px) 56px', maxWidth: 1240, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
         {/* Quick access */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
+        <section className="debtor-quick-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
           <button type="button" onClick={() => setActiveDialog('customer')} style={{ ...cardStyle, border: '1px solid rgba(194,65,12,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick action</span>
             <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>+ Add customer</strong>
@@ -405,7 +404,7 @@ export default function DebtorsApp({ customerId = null }) {
         </div>}
 
         {/* Stats */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
+        <section className="debtor-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 14, marginBottom: 18 }}>
           {[
             [isTa ? 'மொத்த நிலுவை' : 'Total outstanding', money(statOutstanding)],
             [isTa ? 'நிலுவை கணக்குகள்' : 'Open accounts', String(statOpen)],
@@ -644,12 +643,12 @@ export default function DebtorsApp({ customerId = null }) {
 }
 
 /* ── inline styles ── */
-const cardStyle = { background: 'rgba(255,251,244,.85)', border: '1px solid rgba(122,84,48,.18)', borderRadius: 20, padding: 20, backdropFilter: 'blur(12px)', boxShadow: '0 18px 40px rgba(122,84,48,.12)' };
-const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
-const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)' };
-const secondaryBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.26)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
-const softStrongBtn = { background: 'rgba(58,36,21,.9)', color: '#fff5e6', borderColor: 'transparent', fontWeight: 600, borderRadius: 12, padding: '11px 14px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
-const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
-const ledgerTd = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', whiteSpace: 'nowrap' };
-const dialogBackdrop = { position: 'fixed', inset: 0, zIndex: 20, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(58,36,21,.42)' };
+const cardStyle = { background: '#fffaf3', border: '1px solid rgba(105,65,35,.14)', borderRadius: 18, padding: 20, boxShadow: '0 12px 30px rgba(91,53,24,.08)' };
+const fieldStyle = { width: '100%', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(105,65,35,.18)', background: '#fffdf9', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
+const brandBtn = { background: '#d45118', color: '#fff', fontWeight: 700, borderRadius: 10, padding: '12px 15px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 7px 16px rgba(196,72,19,.18)' };
+const secondaryBtn = { background: '#fffdf9', border: '1px solid rgba(105,65,35,.22)', color: '#3a2415', fontWeight: 700, borderRadius: 10, padding: '12px 15px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
+const softStrongBtn = { background: '#493326', color: '#fffaf2', borderColor: 'transparent', fontWeight: 700, borderRadius: 10, padding: '12px 15px', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14 };
+const topbarBtn = { background: '#fffaf3', border: '1px solid rgba(105,65,35,.16)', color: '#3a2415', fontWeight: 700, borderRadius: 10, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-block' };
+const ledgerTd = { padding: '11px 12px', borderBottom: '1px solid rgba(105,65,35,.12)', whiteSpace: 'nowrap' };
+const dialogBackdrop = { position: 'fixed', inset: 0, zIndex: 20, display: 'grid', placeItems: 'center', padding: 16, background: 'rgba(45,27,17,.52)' };
 const filterLabel = { display: 'grid', gap: 5, color: '#8a6a4f', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em' };

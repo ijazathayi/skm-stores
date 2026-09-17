@@ -97,6 +97,56 @@ input[type="number"] { -moz-appearance: textfield; }
   .debtors-detail { display: block; margin-top: 18px; }
 }
 
+  /* ── debtors book ── */
+  .debtor-shell {
+    background: #f6eee4 !important;
+    color: #342319 !important;
+    font-family: 'Trebuchet MS', 'Segoe UI', sans-serif !important;
+  }
+  .debtor-shell::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(120deg, rgba(255,255,255,.5), transparent 42%, rgba(226,166,93,.12));
+  }
+  .debtor-glow { display: none; }
+  .debtor-topbar { max-width: 1240px; margin: 0 auto; padding-top: 28px !important; padding-bottom: 24px !important; }
+  .debtor-topbar p:first-child { color: #342319; letter-spacing: -.02em; }
+  .debtor-main { max-width: 1240px !important; }
+  .debtor-quick-grid button,
+  .debtor-stats-grid > div,
+  .debtor-customer-list,
+  .debtors-detail { transition: transform .18s ease, box-shadow .18s ease; }
+  .debtor-quick-grid button:hover,
+  .debtor-customer-list:hover,
+  .debtors-detail:hover { transform: translateY(-2px); box-shadow: 0 16px 34px rgba(91,53,24,.12) !important; }
+  .debtor-quick-grid strong { color: #342319; }
+  .debtor-stats-grid > div { min-height: 104px; display: flex; flex-direction: column; justify-content: center; }
+  .debtor-stats-grid > div:nth-child(1) { background: #493326 !important; color: #fff8ed; }
+  .debtor-stats-grid > div:nth-child(1) p { color: #e8c9a4 !important; }
+  .debtor-stats-grid > div:nth-child(1) p:last-child { color: #fff8ed !important; }
+  .debtor-customer-list ul { scrollbar-color: #d99b5d transparent; }
+  .debtor-customer-list li button,
+  .debtor-customer-list li a { transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+  .debtor-customer-list li a:hover { transform: translateX(3px); background: #fff4dd !important; border-color: #d99b5d !important; }
+  .debtors-back-link { display: inline-flex; align-items: center; margin-bottom: 16px; text-decoration: none; }
+  .debtors-back-link:hover { background: #fff1d8 !important; }
+  .debtors-detail table th { background: #fbf0df; }
+  .debtors-detail table tbody tr:last-child td { border-bottom: 0 !important; }
+
+  @media (max-width: 700px) {
+    .debtor-topbar { padding-top: 18px !important; }
+    .debtor-main { padding-left: 12px !important; padding-right: 12px !important; }
+    .debtor-quick-grid { grid-template-columns: 1fr !important; }
+    .debtor-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 9px !important; }
+    .debtor-stats-grid > div { min-height: 86px; padding: 14px !important; }
+    .debtor-stats-grid > div p:last-child { font-size: 23px !important; }
+    .debtor-customer-list, .debtors-detail { padding: 15px !important; border-radius: 16px !important; }
+    .debtor-customer-list ul { max-height: none !important; }
+    .debtors-detail { margin-top: 14px !important; }
+  }
+
 /* ── search ── */
 .search-wrap { position: relative; margin-bottom: 14px; }
 .search-row {

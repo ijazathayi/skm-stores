@@ -31,6 +31,13 @@ function mobileLabel(mobile) {
 function hasMobile(mobile) {
   return Boolean(String(mobile || '').trim());
 }
+function normalizeIndianMobile(mobile) {
+  const digits = String(mobile || '').replace(/\D/g, '');
+  if (digits.startsWith('91') && digits.length === 12) return digits;
+  if (digits.length === 10) return `91${digits}`;
+  if (digits.startsWith('0') && digits.length === 11) return `91${digits.slice(1)}`;
+  return digits;
+}
 
 export default function DebtorsApp({ customerId = null }) {
   const { lang, storeProfile } = useStore();
@@ -306,12 +313,11 @@ export default function DebtorsApp({ customerId = null }) {
     const text = messageIsTa
       ? `வணக்கம் ${currentCustomer.name},\nஎஸ்.கே.எம் ஸ்டோர்ஸில் உங்கள் கடன் நிலுவை தொகை: ${money(bal)}.\nதயவுசெய்து விரைவில் செலுத்தவும். நன்றி!`
       : `Hello ${currentCustomer.name},\nYour outstanding balance at SKM Stores is ${money(bal)}.\nPlease clear it at your earliest convenience. Thank you!`;
-    const cleanMobile = String(currentCustomer.mobile || '').replace(/[^0-9]/g, '');
-    if (!cleanMobile) {
+    const mobile = normalizeIndianMobile(currentCustomer.mobile);
+    if (!mobile) {
       alert(isTa ? 'இந்த வாடிக்கையாளரின் அலைபேசி எண் பதிவு செய்யப்படவில்லை.' : 'This customer does not have a registered mobile number.');
       return null;
     }
-    const mobile = cleanMobile.startsWith('91') ? cleanMobile : `91${cleanMobile.replace(/^0+/, '')}`;
     return { mobile, text };
   }
 
@@ -538,13 +544,16 @@ export default function DebtorsApp({ customerId = null }) {
                 </div>
 
                 <div className="debtor-message-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 14 }}>
-                  <button type="button" onClick={sendSms} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...brandBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
+                  <button type="button" onClick={sendSms} title={isTa ? 'WhatsApp இல்லாவிட்டாலும் SMS அனுப்பலாம்' : 'Works even when the number is not on WhatsApp'} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...brandBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
                     {isTa ? '✉️ SMS அனுப்பு' : '✉️ Send SMS'}
                   </button>
-                  <button type="button" onClick={shareWhatsApp} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...softStrongBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
+                  <button type="button" onClick={shareWhatsApp} title={isTa ? 'WhatsApp கணக்கு உள்ள எண்களுக்கு மட்டும்' : 'Only works when the number has WhatsApp'} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...softStrongBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
                     {isTa ? '💬 WhatsApp அனுப்பு' : '💬 Send WhatsApp'}
                   </button>
                 </div>
+                <p style={{ margin: '8px 0 0', color: '#8a6a4f', fontSize: 12 }}>
+                  {isTa ? 'இந்த எண் WhatsApp-ல் இல்லையெனில் SMS பயன்படுத்தவும்.' : 'If this number is not on WhatsApp, use Send SMS instead.'}
+                </p>
 
                 {isEditingCustomer ? (
                   <form onSubmit={saveCustomerDetails} style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 16, padding: 14, borderRadius: 14, background: 'rgba(255,244,222,.75)', border: '1px solid rgba(224,163,37,.38)' }}>

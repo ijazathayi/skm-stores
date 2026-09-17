@@ -32,7 +32,7 @@ function hasMobile(mobile) {
   return Boolean(String(mobile || '').trim());
 }
 
-export default function DebtorsApp() {
+export default function DebtorsApp({ customerId = null }) {
   const { lang } = useStore();
   const { role } = useAuth();
   const isTa = lang === 'ta';
@@ -40,7 +40,7 @@ export default function DebtorsApp() {
   const [customers, setCustomers] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState(customerId);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeDialog, setActiveDialog] = useState(null);
   const [overallStartDate, setOverallStartDate] = useState('');
@@ -471,10 +471,10 @@ export default function DebtorsApp() {
         </div>}
 
         {/* Layout */}
-        <div className={`debtors-layout${selectedId ? ' has-selection' : ''}`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', gap: 18, alignItems: 'start' }}>
+        <div className="debtors-layout" style={{ display: 'grid', gridTemplateColumns: customerId ? 'minmax(0, 760px)' : 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))', justifyContent: customerId ? 'center' : 'initial', gap: 18, alignItems: 'start' }}>
 
           {/* Left: customer list */}
-          <section className="debtors-customer-list" style={cardStyle}>
+          {!customerId && <section className="debtors-customer-list" style={cardStyle}>
             <h2 style={{ margin: '0 0 12px', fontFamily: 'Georgia, serif', fontSize: 22 }}>
               {isTa ? 'வாடிக்கையாளர்கள்' : 'Customers'}
             </h2>
@@ -486,17 +486,13 @@ export default function DebtorsApp() {
                 </li>
               ) : filteredList.map(({ c, bal }) => (
                 <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedId(c.id);
-                      setIsEditingCustomer(false);
-                    }}
+                  <Link
+                    href={`/debtors/${c.id}`}
                     style={{
                       width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10,
                       background: c.id === selectedId ? 'rgba(255,244,222,.95)' : 'rgba(255,255,255,.6)',
                       border: `1px solid ${c.id === selectedId ? '#e0a325' : 'rgba(122,84,48,.18)'}`,
-                      borderRadius: 12, padding: '11px 14px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+                      borderRadius: 12, padding: '11px 14px', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'none', color: 'inherit',
                     }}
                   >
                     <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -511,18 +507,22 @@ export default function DebtorsApp() {
                     <span style={{ fontFamily: 'Georgia, serif', fontSize: 17, color: bal > 0 ? '#3a2415' : '#3f7d3f' }}>
                       {bal > 0 ? money(bal) : 'Clear'}
                     </span>
-                  </button>
+                  </Link>
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
 
           {/* Right: detail */}
-          <section className="debtors-detail" style={cardStyle}>
+          {customerId && <section className="debtors-detail" style={cardStyle}>
             {!currentCustomer ? (
               <p style={{ color: '#8a6a4f', margin: 0, padding: '26px 0', textAlign: 'center' }}>Select a customer to see their ledger.</p>
             ) : (
               <>
+                <Link href="/debtors" className="debtors-back-link" style={secondaryBtn}>
+                  ← {isTa ? 'அனைத்து வாடிக்கையாளர்கள்' : 'Back to all customers'}
+                </Link>
+
                 {/* Detail head */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', alignItems: 'flex-start' }}>
                   <div>
@@ -636,7 +636,7 @@ export default function DebtorsApp() {
                 </div>
               </>
             )}
-          </section>
+          </section>}
         </div>
       </main>
     </div>

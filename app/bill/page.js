@@ -3,7 +3,6 @@ import { useState, useCallback, useEffect } from 'react';
 import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
-import { printReceipt } from '@/lib/printReceipt';
 import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
 import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
@@ -251,10 +250,7 @@ export default function BillPage() {
               </div>
             </div>
             <div style={{ display: 'grid', gap: 8 }}>
-              <button className="btn-primary" onClick={() => printReceipt(lastBill, storeProfile, { lang })}>
-                🖨 {isTa ? 'சாதாரணமாக அச்சிடு' : 'Print bill'}
-              </button>
-              <button className="btn-secondary" onClick={handleBluetoothPrint}>
+              <button className="btn-primary" onClick={handleBluetoothPrint}>
                 📡 {isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Bluetooth print'}
               </button>
               <button className="btn-secondary" onClick={handleEditLastBill}>

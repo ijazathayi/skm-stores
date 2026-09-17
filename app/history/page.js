@@ -1,9 +1,9 @@
 'use client';
+import { useState } from 'react';
 import Header from '@/components/Header';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
-import { printReceipt } from '@/lib/printReceipt';
 import { getProductName } from '@/lib/translations';
 import { useAuth } from '@/components/AuthProvider';
 import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
@@ -26,12 +26,7 @@ export default function HistoryPage() {
   const { role } = useAuth();
   const router = useRouter();
   const isTa = lang === 'ta';
-
-  const printBill = (b) => {
-    if (typeof window !== 'undefined') {
-      printReceipt(b, storeProfile, { lang });
-    }
-  };
+  const [selectedBill, setSelectedBill] = useState(null);
 
   const printBillBluetooth = async (bill) => {
     if (!supportsBluetoothPrinting()) {
@@ -86,7 +81,17 @@ export default function HistoryPage() {
 
                   {/* ── Bills for this day ── */}
                   {dayBills.map((b) => (
-                    <div key={b.id} className="bill-card" style={{ marginLeft: 4 }}>
+                    <div
+                      key={b.id}
+                      className="bill-card"
+                      style={{ marginLeft: 4, width: 'calc(100% - 4px)', textAlign: 'left', cursor: 'pointer' }}
+                      onClick={() => setSelectedBill(b)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') setSelectedBill(b);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>
                           {new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -96,12 +101,11 @@ export default function HistoryPage() {
                             </span>
                           )}
                         </div>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={(event) => event.stopPropagation()}>
                           <span style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 700, color: 'var(--primary-dark)' }}>
                             {money(b.total)}
                           </span>
                           <button className="icon-btn" title={isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Print via Bluetooth'} onClick={() => printBillBluetooth(b)}>📡</button>
-                          <button className="icon-btn" onClick={() => printBill(b)}>🖨</button>
                           <button className="icon-btn" title={isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'} onClick={() => startEdit(b)}>✏️</button>
                           {role === 'admin' && <button className="icon-btn" title="Delete sale" onClick={() => { if (window.confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>}
                         </span>
@@ -109,10 +113,8 @@ export default function HistoryPage() {
                       <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>
                         {(b.items || []).length} {isTa ? 'பொருட்கள்' : 'items'}
                       </div>
-                      <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: '4px 14px', fontFamily: 'monospace', fontSize: 11.5, color: 'var(--ink2)' }}>
-                        {(b.items || []).map((it, i) => (
-                          <span key={i}>{getProductName(it, lang)} × {it.qty} @ {money(it.price)}</span>
-                        ))}
+                      <div style={{ marginTop: 7, fontSize: 11.5, color: 'var(--primary-dark)', fontWeight: 600 }}>
+                        {isTa ? 'முழு ரசீதைப் பார்க்க தட்டவும்' : 'Click to view full sale'}
                       </div>
                     </div>
                   ))}
@@ -122,6 +124,50 @@ export default function HistoryPage() {
           </>
         )}
       </main>
+      {selectedBill && (
+        <div className="drawer-overlay" onClick={() => setSelectedBill(null)}>
+          <div className="bill-card" style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(520px, calc(100% - 32px))', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto', zIndex: 20, margin: 0 }} onClick={(event) => event.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{isTa ? 'விற்பனை விவரங்கள்' : 'Sale details'}</div>
+                <div style={{ color: 'var(--ink3)', fontSize: 13, marginTop: 3 }}>
+                  {new Date(selectedBill.timestamp).toLocaleString(isTa ? 'ta-IN' : 'en-GB')} · #{selectedBill.billNo}
+                </div>
+              </div>
+              <button className="drawer-close" onClick={() => setSelectedBill(null)}>✕</button>
+            </div>
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 390 }}>
+                <thead>
+                  <tr style={{ background: 'var(--paper)', color: 'var(--ink3)', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 7px' }}>#</th>
+                    <th style={{ padding: '8px 7px' }}>{isTa ? 'பொருள்' : 'Item'}</th>
+                    <th style={{ padding: '8px 7px', textAlign: 'right' }}>{isTa ? 'அளவு' : 'Qty'}</th>
+                    <th style={{ padding: '8px 7px', textAlign: 'right' }}>{isTa ? 'தொகை' : 'Amount'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(selectedBill.items || []).map((item, index) => (
+                    <tr key={`${item.name}-${index}`} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 7px', color: 'var(--ink3)' }}>{index + 1}</td>
+                      <td style={{ padding: '8px 7px', fontWeight: 600 }}>{getProductName(item, lang)}</td>
+                      <td style={{ padding: '8px 7px', textAlign: 'right', whiteSpace: 'nowrap' }}>{item.qty} {item.unit === 'kg' ? 'kg' : 'pc'}</td>
+                      <td style={{ padding: '8px 7px', textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>{money((Number(item.qty) || 0) * (Number(item.price) || 0))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 17, fontWeight: 800, marginBottom: 14 }}>
+              <span>{isTa ? 'மொத்தம்' : 'Total'}</span>
+              <span style={{ color: 'var(--primary-dark)' }}>{money(selectedBill.total)}</span>
+            </div>
+            <button className="btn-primary" onClick={() => printBillBluetooth(selectedBill)}>
+              📡 {isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Bluetooth print'}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

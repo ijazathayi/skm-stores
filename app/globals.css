@@ -100,10 +100,9 @@ input[type="number"] { -moz-appearance: textfield; }
   padding: 18px; box-shadow: 0 8px 22px rgba(74,68,111,.06);
 }
 .settings-card h4 { margin: 0; font-size: 17px; color: var(--ink); }
-.language-setting-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.language-segmented-control { flex: 1 1 260px; min-width: 0; }
-.language-segmented-control button { flex: 1 1 0; min-width: 0; }
-.language-setting-help { flex: 1 1 190px; }
+.language-control { display: flex !important; width: 100%; }
+.language-control button { flex: 1 1 0; min-width: 0; }
+.language-setting-help { display: block; margin-top: 1px; }
 .stat-pill {
   display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 6px 11px;
   background: rgba(255,255,255,.82); border: 1px solid var(--border); border-radius: 10px;
@@ -170,9 +169,7 @@ input[type="number"] { -moz-appearance: textfield; }
     .debtor-customer-list, .debtors-detail { padding: 15px !important; border-radius: 16px !important; }
     .debtor-customer-list ul { max-height: none !important; }
     .debtors-detail { margin-top: 14px !important; }
-    .language-setting-row { display: block; }
-    .language-segmented-control { display: flex !important; width: 100%; }
-    .language-setting-help { display: block; margin-top: 7px; }
+    .language-setting-help { margin-top: 7px; }
   }
 
 /* ── search ── */

@@ -536,7 +536,7 @@ export default function DebtorsApp({ customerId = null }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 14 }}>
+                <div className="debtor-message-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 14 }}>
                   <button type="button" onClick={sendSms} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...brandBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
                     {isTa ? '✉️ SMS அனுப்பு' : '✉️ Send SMS'}
                   </button>

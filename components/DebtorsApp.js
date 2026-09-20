@@ -253,25 +253,15 @@ export default function DebtorsApp({ customerId = null }) {
       return;
     }
 
+    const productName = debtProduct.trim();
     const entryDate = debtDate || today();
-    const isDuplicate = entries.some((entry) =>
-      entry.customerId === selectedId &&
-      entry.kind === 'debt' &&
-      entry.date === entryDate &&
-      Number(entry.amount) === amount
-    );
-    if (isDuplicate && !window.confirm(
-      isTa
-        ? `இந்த வாடிக்கையாளருக்கு ${fmtDate(entryDate)} அன்று ${money(amount)} கடன் ஏற்கனவே உள்ளது. இதையும் சேர்க்க வேண்டுமா?`
-        : `A debt of ${money(amount)} already exists for this customer on ${fmtDate(entryDate)}. Add this one as well?`
-    )) return;
 
     try {
       setIsSubmittingDebt(true);
       await addDoc(collection(db, 'debtors_entries'), {
         customerId: selectedId,
         kind: 'debt',
-        product: debtProduct.trim() || '',
+        product: productName,
         qty: debtQty.trim() || '',
         amount,
         date: entryDate,

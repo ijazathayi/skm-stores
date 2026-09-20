@@ -2,7 +2,7 @@
 import { useState, useRef } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
-import { STORE_CATEGORIES, getProductCategory, matchesSearch, generateProductId } from '@/lib/helpers';
+import { STORE_CATEGORIES, getProductCategory, matchesSearch, generateProductId, normalizeSearchText } from '@/lib/helpers';
 import { exportInventory, parseImportFile } from '@/lib/inventoryExcel';
 import { getProductName } from '@/lib/translations';
 import { doc, setDoc, writeBatch } from 'firebase/firestore';
@@ -63,6 +63,16 @@ export default function InventoryPage() {
 
   const handleSave = async () => {
     if (!form.name.trim()) { alert(isTa ? 'பெயர் கட்டாயம்' : 'Name required'); return; }
+    const editPrice = Number(form.price);
+    const duplicate = editPrice > 0 && inventory.some((item) =>
+      item.id !== editItem.id &&
+      normalizeSearchText(item.name) === normalizeSearchText(form.name) &&
+      Number(item.price) === editPrice
+    );
+    if (duplicate) {
+      alert(isTa ? 'இந்த பெயர் மற்றும் விலை ஏற்கனவே சரக்கில் உள்ளது.' : 'A product with this name and price already exists in inventory.');
+      return;
+    }
 
     const oldCatId = getProductCategory(editItem);
     const newCatId = form.category && form.category !== 'auto' ? form.category : oldCatId;

@@ -38,6 +38,15 @@ function normalizeIndianMobile(mobile) {
   if (digits.startsWith('0') && digits.length === 11) return `91${digits.slice(1)}`;
   return digits;
 }
+function getCurrentDebtCycle(entries) {
+  let running = 0;
+  let cycleStart = 0;
+  entries.forEach((entry, index) => {
+    running += entry.kind === 'debt' ? (Number(entry.amount) || 0) : -(Number(entry.amount) || 0);
+    if (running <= 0) cycleStart = index + 1;
+  });
+  return entries.slice(cycleStart);
+}
 
 export default function DebtorsApp({ customerId = null }) {
   const { lang, storeProfile } = useStore();
@@ -311,7 +320,7 @@ export default function DebtorsApp({ customerId = null }) {
   function getMessageDetails() {
     if (!currentCustomer) return;
     const bal = getCustomerBalance(currentCustomer.id);
-    const customerEntries = getCustomerEntries(currentCustomer.id);
+    const customerEntries = getCurrentDebtCycle(getCustomerEntries(currentCustomer.id));
     const text = messageMode === 'details'
       ? getDetailedMessage(currentCustomer, customerEntries, bal)
       : messageIsTa
@@ -346,17 +355,85 @@ export default function DebtorsApp({ customerId = null }) {
     return `Hello ${customer.name},\n\nYour SKM Stores debt details:\n${debtLines}\n\nRepayments:\n${paymentLines}\n\nOutstanding balance: ${money(balance)}\nThank you!`;
   }
 
-  function shareWhatsApp() {
-    const details = getMessageDetails();
-    if (!details) return;
-    const url = `https://wa.me/${details.mobile}?text=${encodeURIComponent(details.text)}`;
-    window.open(url, '_blank');
+  async function renderDebtImages() {
+    if (!currentCustomer) return [];
+    const { default: html2canvas } = await import('html2canvas');
+    const allEntries = getCurrentDebtCycle(getCustomerEntries(currentCustomer.id));
+    const entriesToRender = messageMode === 'details' ? allEntries : [];
+    const chunks = [];
+    const pageSize = 8;
+    if (!entriesToRender.length) chunks.push([]);
+    for (let index = 0; index < entriesToRender.length; index += pageSize) {
+      chunks.push(entriesToRender.slice(index, index + pageSize));
+    }
+    const balance = getCustomerBalance(currentCustomer.id);
+    const pages = [];
+    for (const [pageIndex, pageEntries] of chunks.entries()) {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;padding:44px;background:#fff;color:#24170f;font-family:Arial,sans-serif;';
+      const title = messageIsTa ? 'கடன் கணக்கு விவரம்' : 'DEBT ACCOUNT STATEMENT';
+      const customerLabel = messageIsTa ? 'வாடிக்கையாளர்' : 'Customer';
+      const dateLabel = messageIsTa ? 'தேதி' : 'Date';
+      const itemLabel = messageIsTa ? 'பொருள்' : 'Product';
+      const qtyLabel = messageIsTa ? 'அளவு' : 'Qty';
+      const amountLabel = messageIsTa ? 'விலை' : 'Amount';
+      const paidLabel = messageIsTa ? 'செலுத்தியது' : 'Payment';
+      const outstandingLabel = messageIsTa ? 'மீதம் செலுத்த வேண்டியது' : 'Outstanding balance';
+      wrapper.innerHTML = `<div style="border:3px solid #493326;padding:28px;background:#fffdf9;">
+        <div style="font-size:30px;font-weight:800;color:#493326;">SKM STORES</div>
+        <div style="font-size:22px;font-weight:700;margin-top:8px;">${title}</div>
+        <div style="font-size:20px;margin-top:18px;"><b>${customerLabel}:</b> ${escapeHtml(currentCustomer.name)}</div>
+        <div style="font-size:18px;margin-top:6px;"><b>${dateLabel}:</b> ${fmtDate(today())}</div>
+        <div style="height:2px;background:#d7b88d;margin:22px 0 14px;"></div>
+        ${messageMode === 'details' ? `<table style="width:100%;border-collapse:collapse;font-size:18px;"><thead><tr style="background:#f5e7d0;"><th style="padding:12px;text-align:left;">${dateLabel}</th><th style="padding:12px;text-align:left;">${itemLabel}</th><th style="padding:12px;text-align:center;">${qtyLabel}</th><th style="padding:12px;text-align:right;">${amountLabel}</th></tr></thead><tbody>${pageEntries.map((entry) => entry.kind === 'debt'
+          ? `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${fmtDate(entry.date)}</td><td style="padding:12px;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.product || 'Purchase')}</td><td style="padding:12px;text-align:center;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.qty || '-')}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">${money(entry.amount)}</td></tr>`
+          : `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${fmtDate(entry.date)}</td><td colspan="2" style="padding:12px;border-bottom:1px solid #eadbc6;">${paidLabel}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">-${money(entry.amount)}</td></tr>`).join('')}</tbody></table>` : `<div style="font-size:26px;padding:24px 0;">${messageIsTa ? 'நிலுவைத் தொகை' : 'Amount currently due'}</div>`}
+        <div style="margin-top:24px;padding:18px;background:#493326;color:#fff;font-size:26px;font-weight:800;text-align:right;">${outstandingLabel}: ${money(balance)}</div>
+        ${chunks.length > 1 ? `<div style="font-size:16px;margin-top:18px;text-align:center;color:#80664d;">${pageIndex + 1} / ${chunks.length}</div>` : ''}
+      </div>`;
+      document.body.appendChild(wrapper);
+      try {
+        pages.push(await html2canvas(wrapper, { backgroundColor: '#ffffff', scale: 2 }));
+      } finally {
+        wrapper.remove();
+      }
+    }
+    return pages;
   }
 
-  function sendSms() {
-    const details = getMessageDetails();
-    if (!details) return;
-    window.open(`sms:+${details.mobile}?body=${encodeURIComponent(details.text)}`, '_self');
+  async function downloadDebtImages() {
+    try {
+      const pages = await renderDebtImages();
+      pages.forEach((canvas, index) => {
+        const link = document.createElement('a');
+        link.download = `${currentCustomer.name.replace(/[^a-z0-9]+/gi, '_')}_debt_${index + 1}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    } catch (err) {
+      console.error('Debt image generation failed:', err);
+      alert(isTa ? 'படம் உருவாக்க முடியவில்லை.' : 'Could not create the debt image.');
+    }
+  }
+
+  async function shareDebtImages() {
+    try {
+      const pages = await renderDebtImages();
+      const files = await Promise.all(pages.map((canvas, index) => new Promise((resolve) => {
+        canvas.toBlob((blob) => resolve(new File([blob], `debt_${index + 1}.png`, { type: 'image/png' })), 'image/png');
+      })));
+      if (navigator.canShare && navigator.canShare({ files })) {
+        await navigator.share({ files, title: isTa ? 'கடன் கணக்கு' : 'Debt account statement' });
+      } else {
+        await downloadDebtImages();
+        alert(isTa ? 'பகிரும் வசதி இல்லை. படங்கள் பதிவிறக்கப்பட்டன.' : 'Image sharing is not supported. The images were downloaded.');
+      }
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Debt image sharing failed:', err);
+        await downloadDebtImages();
+      }
+    }
   }
 
   /* ── Ledger calculations ── */
@@ -569,11 +646,11 @@ export default function DebtorsApp({ customerId = null }) {
                 </div>
 
                 <div className="debtor-message-actions" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 8, marginTop: 14 }}>
-                  <button type="button" onClick={sendSms} title={isTa ? 'WhatsApp இல்லாவிட்டாலும் SMS அனுப்பலாம்' : 'Works even when the number is not on WhatsApp'} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...brandBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
-                    {isTa ? '✉️ SMS அனுப்பு' : '✉️ Send SMS'}
+                  <button type="button" onClick={shareDebtImages} title={isTa ? 'கடன் படத்தை பகிரவும்' : 'Share the debt statement as an image'} style={brandBtn}>
+                    {isTa ? '🖼️ படத்தை பகிர்' : '🖼️ Share image'}
                   </button>
-                  <button type="button" onClick={shareWhatsApp} title={isTa ? 'WhatsApp கணக்கு உள்ள எண்களுக்கு மட்டும்' : 'Only works when the number has WhatsApp'} disabled={!hasMobile(currentCustomer.mobile)} style={{ ...softStrongBtn, opacity: hasMobile(currentCustomer.mobile) ? 1 : 0.5 }}>
-                    {isTa ? '💬 WhatsApp அனுப்பு' : '💬 Send WhatsApp'}
+                  <button type="button" onClick={downloadDebtImages} title={isTa ? 'கடன் படத்தை பதிவிறக்கவும்' : 'Download the debt statement as an image'} style={softStrongBtn}>
+                    {isTa ? '⬇️ படத்தை பதிவிறக்கு' : '⬇️ Download image'}
                   </button>
                 </div>
                 <div role="group" aria-label={isTa ? 'செய்தி வகை' : 'Message type'} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
@@ -590,7 +667,7 @@ export default function DebtorsApp({ customerId = null }) {
                 <p style={{ margin: '8px 0 0', color: '#8a6a4f', fontSize: 12 }}>
                   {messageMode === 'details'
                     ? (isTa ? 'தயாரிப்பு, அளவு, விலை மற்றும் செலுத்திய தொகைகள் சேர்க்கப்படும்.' : 'Includes products, quantities, prices and repayments.')
-                    : (isTa ? 'சுருக்கமான நிலுவைத் தொகை மட்டும் அனுப்பப்படும்.' : 'Only the outstanding balance will be sent.')}
+                    : (isTa ? 'சுருக்கமான நிலுவைத் தொகை படம் மட்டும் உருவாக்கப்படும்.' : 'Only the current outstanding balance will be shown in the image.')}
                 </p>
 
                 {isEditingCustomer ? (

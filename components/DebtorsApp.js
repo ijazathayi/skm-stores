@@ -76,6 +76,7 @@ export default function DebtorsApp({ customerId = null }) {
   const [payDate, setPayDate] = useState(today());
   const [payNote, setPayNote] = useState('');
   const [isSubmittingPay, setIsSubmittingPay] = useState(false);
+  const [messageMode, setMessageMode] = useState('summary');
 
   // Firestore Realtime Listeners
   useEffect(() => {
@@ -310,15 +311,39 @@ export default function DebtorsApp({ customerId = null }) {
   function getMessageDetails() {
     if (!currentCustomer) return;
     const bal = getCustomerBalance(currentCustomer.id);
-    const text = messageIsTa
-      ? `வணக்கம் ${currentCustomer.name},\nஎஸ்.கே.எம் ஸ்டோர்ஸில் உங்கள் கடன் நிலுவை தொகை: ${money(bal)}.\nதயவுசெய்து விரைவில் செலுத்தவும். நன்றி!`
-      : `Hello ${currentCustomer.name},\nYour outstanding balance at SKM Stores is ${money(bal)}.\nPlease clear it at your earliest convenience. Thank you!`;
+    const customerEntries = getCustomerEntries(currentCustomer.id);
+    const text = messageMode === 'details'
+      ? getDetailedMessage(currentCustomer, customerEntries, bal)
+      : messageIsTa
+        ? `வணக்கம் ${currentCustomer.name},\nஎஸ்.கே.எம் ஸ்டோர்ஸில் உங்கள் கடன் நிலுவை தொகை: ${money(bal)}.\nதயவுசெய்து விரைவில் செலுத்தவும். நன்றி!`
+        : `Hello ${currentCustomer.name},\nYour outstanding balance at SKM Stores is ${money(bal)}.\nPlease clear it at your earliest convenience. Thank you!`;
     const mobile = normalizeIndianMobile(currentCustomer.mobile);
     if (!mobile) {
       alert(isTa ? 'இந்த வாடிக்கையாளரின் அலைபேசி எண் பதிவு செய்யப்படவில்லை.' : 'This customer does not have a registered mobile number.');
       return null;
     }
     return { mobile, text };
+  }
+
+  function getDetailedMessage(customer, customerEntries, balance) {
+    const debts = customerEntries.filter((entry) => entry.kind === 'debt');
+    const payments = customerEntries.filter((entry) => entry.kind === 'payment');
+    if (messageIsTa) {
+      const debtLines = debts.length
+        ? debts.map((entry) => `- ${fmtDate(entry.date)}: ${entry.product || 'Purchase'}${entry.qty ? ` x ${entry.qty}` : ''} - ${money(entry.amount)}`).join('\n')
+        : '- பதிவுகள் இல்லை';
+      const paymentLines = payments.length
+        ? payments.map((entry) => `- ${fmtDate(entry.date)}: ${money(entry.amount)}${entry.note ? ` (${entry.note})` : ''}`).join('\n')
+        : '- செலுத்திய பதிவுகள் இல்லை';
+      return `வணக்கம் ${customer.name},\n\nஉங்கள் கடன் விவரங்கள்:\n${debtLines}\n\nசெலுத்திய தொகைகள்:\n${paymentLines}\n\nமீதம் செலுத்த வேண்டியது: ${money(balance)}\nநன்றி!`;
+    }
+    const debtLines = debts.length
+      ? debts.map((entry) => `- ${fmtDate(entry.date)}: ${entry.product || 'Purchase'}${entry.qty ? ` x ${entry.qty}` : ''} - ${money(entry.amount)}`).join('\n')
+      : '- No purchase entries';
+    const paymentLines = payments.length
+      ? payments.map((entry) => `- ${fmtDate(entry.date)}: ${money(entry.amount)}${entry.note ? ` (${entry.note})` : ''}`).join('\n')
+      : '- No repayments recorded';
+    return `Hello ${customer.name},\n\nYour SKM Stores debt details:\n${debtLines}\n\nRepayments:\n${paymentLines}\n\nOutstanding balance: ${money(balance)}\nThank you!`;
   }
 
   function shareWhatsApp() {
@@ -381,7 +406,7 @@ export default function DebtorsApp({ customerId = null }) {
       <main className="debtor-main" style={{ padding: '0 clamp(16px,4vw,40px) 56px', maxWidth: 1240, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
         {/* Quick access */}
-        <section className="debtor-quick-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
+        {!customerId && <section className="debtor-quick-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 14, marginBottom: 18 }}>
           <button type="button" onClick={() => setActiveDialog('customer')} style={{ ...cardStyle, border: '1px solid rgba(194,65,12,.28)', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit' }}>
             <span style={{ display: 'block', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.14em', color: '#8a6a4f' }}>Quick action</span>
             <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>+ Add customer</strong>
@@ -392,7 +417,7 @@ export default function DebtorsApp({ customerId = null }) {
             <strong style={{ display: 'block', marginTop: 6, fontFamily: 'Georgia, serif', fontSize: 22 }}>Overall ledger</strong>
             <span style={{ display: 'block', marginTop: 5, color: '#8a6a4f', fontSize: 13 }}>See every customer debt and repayment together.</span>
           </button>
-        </section>
+        </section>}
 
         {activeDialog === 'customer' && <div style={dialogBackdrop}>
           <section role="dialog" aria-modal="true" aria-labelledby="add-customer-title" style={{ ...cardStyle, width: 'min(460px, 100%)' }}>
@@ -551,8 +576,21 @@ export default function DebtorsApp({ customerId = null }) {
                     {isTa ? '💬 WhatsApp அனுப்பு' : '💬 Send WhatsApp'}
                   </button>
                 </div>
+                <div role="group" aria-label={isTa ? 'செய்தி வகை' : 'Message type'} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+                  <span style={{ color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{isTa ? 'செய்தி:' : 'Message:'}</span>
+                  {[
+                    ['summary', isTa ? 'தொகை மட்டும்' : 'Balance only'],
+                    ['details', isTa ? 'முழு விவரங்கள்' : 'Full details'],
+                  ].map(([mode, label]) => (
+                    <button key={mode} type="button" onClick={() => setMessageMode(mode)} aria-pressed={messageMode === mode} style={{ ...(messageMode === mode ? softStrongBtn : secondaryBtn), padding: '8px 11px', fontSize: 12 }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <p style={{ margin: '8px 0 0', color: '#8a6a4f', fontSize: 12 }}>
-                  {isTa ? 'இந்த எண் WhatsApp-ல் இல்லையெனில் SMS பயன்படுத்தவும்.' : 'If this number is not on WhatsApp, use Send SMS instead.'}
+                  {messageMode === 'details'
+                    ? (isTa ? 'தயாரிப்பு, அளவு, விலை மற்றும் செலுத்திய தொகைகள் சேர்க்கப்படும்.' : 'Includes products, quantities, prices and repayments.')
+                    : (isTa ? 'சுருக்கமான நிலுவைத் தொகை மட்டும் அனுப்பப்படும்.' : 'Only the outstanding balance will be sent.')}
                 </p>
 
                 {isEditingCustomer ? (

@@ -2,14 +2,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
-import { money } from '@/lib/helpers';
+import { getProductCategory, money } from '@/lib/helpers';
 import { auth } from '@/lib/firebase';
 
 export default function AdminPage() {
   const {
     inventory, bills, todaySales,
     deleteSale, deleteInventoryItem,
-    milkPrices, updateMilkPrices, lang
+    milkPrices, updateMilkPrices, categories, updateCategories, lang
   } = useStore();
   const isTa = lang === 'ta';
 
@@ -23,6 +23,9 @@ export default function AdminPage() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [staffMsg, setStaffMsg] = useState('');
   const [staffSaving, setStaffSaving] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ label: '', labelTa: '', icon: '📦' });
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryMsg, setCategoryMsg] = useState('');
 
   const staffRequest = useCallback(async (method, body) => {
     const token = await auth.currentUser?.getIdToken();
@@ -87,6 +90,52 @@ export default function AdminPage() {
     setEditingStaff(member);
     setStaffForm({ name: member.name || member.email?.split('@')[0] || '', password: '', role: member.role || 'staff' });
     setStaffMsg('');
+  }
+
+  function categoryIdFor(label) {
+    const letters = label.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    let id = letters.slice(0, 2) || 'CT';
+    let suffix = 2;
+    while (categories.some((category) => category.id === id && category.id !== editingCategory?.id)) {
+      id = `${letters.slice(0, 1) || 'C'}${suffix}`;
+      suffix += 1;
+    }
+    return id;
+  }
+
+  async function saveCategory(event) {
+    event.preventDefault();
+    const label = categoryForm.label.trim();
+    if (!label) return;
+    const category = {
+      id: editingCategory?.id || categoryIdFor(label),
+      prefix: editingCategory?.prefix || editingCategory?.id || categoryIdFor(label),
+      label,
+      labelTa: categoryForm.labelTa.trim(),
+      icon: categoryForm.icon.trim() || '📦',
+      keywords: editingCategory?.keywords || [label.toLowerCase()],
+    };
+    const next = editingCategory
+      ? categories.map((current) => current.id === editingCategory.id ? category : current)
+      : [...categories, category];
+    try {
+      await updateCategories(next);
+      setCategoryForm({ label: '', labelTa: '', icon: '📦' });
+      setEditingCategory(null);
+      setCategoryMsg('Category saved.');
+    } catch (error) {
+      setCategoryMsg(error.message);
+    }
+  }
+
+  async function removeCategory(category) {
+    if (inventory.some((item) => getProductCategory(item, categories) === category.id)) {
+      setCategoryMsg('Move products out of this category before deleting it.');
+      return;
+    }
+    if (!window.confirm(`Delete the ${category.label} category?`)) return;
+    await updateCategories(categories.filter((current) => current.id !== category.id));
+    setCategoryMsg('Category deleted.');
   }
 
   const totalRevenue = bills.reduce((s, b) => s + (b.total || 0), 0);
@@ -191,6 +240,27 @@ export default function AdminPage() {
             {editingStaff && <button onClick={() => { setEditingStaff(null); setStaffForm({ name: '', password: '', role: 'staff' }); }} style={{ marginBottom: 12, border: 0, background: 'transparent', color: 'var(--ink3)', textDecoration: 'underline', cursor: 'pointer' }}>Cancel editing</button>}
           <div className="inv-list">
             {staff.map((member) => <div key={member.id} className="inv-row"><div style={{ flex: 1 }}><strong>{member.name || member.email || member.id}</strong><span style={{ display: 'block', color: 'var(--ink3)', fontSize: 12 }}>{member.email} · {member.role}</span></div><button className="icon-btn" onClick={() => beginStaffEdit(member)} title="Edit staff">✏️</button><button className="icon-btn" onClick={() => removeStaff(member)} title="Delete staff">🗑</button></div>)}
+          </div>
+        </div>
+
+        {/* ── Category management ── */}
+        <div className="settings-card" style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+            <div>
+              <h4 style={{ margin: 0 }}>🗂 Categories</h4>
+              <div style={{ fontSize: 12, color: 'var(--ink3)', marginTop: 3 }}>Create or edit the categories shown on inventory and billing screens.</div>
+            </div>
+            {categoryMsg && <span style={{ fontSize: 13, color: categoryMsg.includes('saved') || categoryMsg.includes('deleted') ? 'var(--primary-dark)' : 'var(--danger)' }}>{categoryMsg}</span>}
+          </div>
+          <form onSubmit={saveCategory} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px auto', gap: 8, marginBottom: 14 }}>
+            <input value={categoryForm.label} onChange={(event) => setCategoryForm({ ...categoryForm, label: event.target.value })} placeholder="Category name" required style={priceInputStyle} />
+            <input value={categoryForm.labelTa} onChange={(event) => setCategoryForm({ ...categoryForm, labelTa: event.target.value })} placeholder="Tamil name (optional)" style={priceInputStyle} />
+            <input value={categoryForm.icon} onChange={(event) => setCategoryForm({ ...categoryForm, icon: event.target.value })} placeholder="Icon" style={priceInputStyle} />
+            <button type="submit" style={{ background: 'var(--primary)', color: '#fff', border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 700, cursor: 'pointer' }}>{editingCategory ? 'Update' : 'Add'}</button>
+          </form>
+          {editingCategory && <button onClick={() => { setEditingCategory(null); setCategoryForm({ label: '', labelTa: '', icon: '📦' }); }} style={{ marginBottom: 12, border: 0, background: 'transparent', color: 'var(--ink3)', textDecoration: 'underline', cursor: 'pointer' }}>Cancel editing</button>}
+          <div className="inv-list">
+            {categories.map((category) => <div key={category.id} className="inv-row"><div style={{ flex: 1 }}><strong>{category.icon} {category.label}</strong><span style={{ display: 'block', color: 'var(--ink3)', fontSize: 12 }}>{category.labelTa || category.id}</span></div><button className="icon-btn" onClick={() => { setEditingCategory(category); setCategoryForm({ label: category.label, labelTa: category.labelTa || '', icon: category.icon || '📦' }); }}>✎</button><button className="icon-btn" onClick={() => removeCategory(category)}>🗑</button></div>)}
           </div>
         </div>
 

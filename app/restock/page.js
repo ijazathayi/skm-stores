@@ -29,6 +29,12 @@ function formatDate(value = new Date().toISOString()) {
   return `${date.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })} ${date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+function formatItemDate(value) {
+  if (!value) return '—';
+  const date = new Date(String(value).includes('T') ? value : `${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
 function normalizeState(value) {
   const pending = Array.isArray(value?.pending) ? value.pending : [];
   const legacyItems = Array.isArray(value?.batches)
@@ -45,7 +51,7 @@ export default function RestockPage() {
   const { user } = useAuth();
   const { inventory } = useStore();
   const [state, setState] = useState(EMPTY_STATE);
-  const [form, setForm] = useState({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
+  const [form, setForm] = useState({ name: '', qty: '1', unit: 'pcs', price: '', date: new Date().toISOString().slice(0, 10), note: '' });
   const [toast, setToast] = useState('');
   const [receipt, setReceipt] = useState(null);
   const [activeTab, setActiveTab] = useState('pending');
@@ -95,13 +101,14 @@ export default function RestockPage() {
         qty: form.qty ? Number(form.qty) : 1,
         unit: form.unit,
         price: form.price ? Number(form.price) : null,
+        date: form.date,
         note: form.note.trim(),
         bought: false,
         addedAt: new Date().toISOString(),
       }, ...state.pending],
     };
     updateState(nextState);
-    setForm({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
+    setForm({ name: '', qty: '1', unit: 'pcs', price: '', date: new Date().toISOString().slice(0, 10), note: '' });
   };
 
   const addInventoryItem = (product) => {
@@ -119,13 +126,14 @@ export default function RestockPage() {
         qty: 1,
         unit: product.unit === 'kg' ? 'kg' : 'pcs',
         price: product.price ? Number(product.price) : null,
+        date: new Date().toISOString().slice(0, 10),
         note: '',
         bought: false,
         addedAt: new Date().toISOString(),
       }, ...state.pending],
     };
     updateState(nextState, `${product.name} added to restock list`);
-    setForm({ name: '', qty: '1', unit: 'pcs', price: '', note: '' });
+    setForm({ name: '', qty: '1', unit: 'pcs', price: '', date: new Date().toISOString().slice(0, 10), note: '' });
   };
 
   const deleteItem = (id) => {
@@ -137,11 +145,12 @@ export default function RestockPage() {
     const name = window.prompt('Product name', item.name);
     if (name === null || !name.trim()) return;
     const qty = window.prompt('Quantity', String(item.qty ?? 1));
+    const date = window.prompt('Date (YYYY-MM-DD)', item.date || item.addedAt?.slice(0, 10) || new Date().toISOString().slice(0, 10));
     const note = window.prompt('Note', item.note || '');
     const nextState = {
       ...state,
       pending: state.pending.map((current) => current.id === item.id
-        ? { ...current, name: name.trim(), qty: qty ? Number(qty) : 1, note: note?.trim() || '' }
+        ? { ...current, name: name.trim(), qty: qty ? Number(qty) : 1, date: date || current.date, note: note?.trim() || '' }
         : current),
     };
     updateState(nextState);
@@ -208,6 +217,7 @@ export default function RestockPage() {
               </div>
               <input type="number" min="0" step="any" value={form.qty} onChange={(event) => setForm({ ...form, qty: event.target.value })} placeholder="Qty" />
               <select value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })}>{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select>
+              <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} aria-label="Date" />
               <input type="number" min="0" step="any" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Price ₹" />
               <input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Note (optional)" />
               <button className="restock-primary-btn" type="submit">Add</button>
@@ -223,7 +233,7 @@ export default function RestockPage() {
                 {visibleItems.map((item) => (
                   <div className="restock-item" key={item.id}>
                     <input type="checkbox" aria-label={`${item.name}: ${item.bought ? 'Bought' : 'Still need to buy'}`} checked={Boolean(item.bought)} onChange={(event) => toggleItem(item.id, event.target.checked)} />
-                    <div className="restock-item-main"><strong>{item.name}</strong><span>{formatQty(item)} {item.price ? `· ${formatPrice(item.price)}` : ''}</span>{item.note && <small>{item.note}</small>}</div>
+                    <div className="restock-item-main"><strong>{item.name}</strong><span>{formatItemDate(item.date || item.addedAt)} · {formatQty(item)} {item.price ? `· ${formatPrice(item.price)}` : ''}</span>{item.note && <small>{item.note}</small>}</div>
                     <div className="restock-item-actions"><button onClick={() => editItem(item)} title="Edit">✎</button><button onClick={() => deleteItem(item.id)} title="Delete">🗑</button></div>
                   </div>
                 ))}
@@ -236,7 +246,7 @@ export default function RestockPage() {
         <button className="restock-clear-btn" onClick={clearAll}>Clear all data</button>
       </main>
 
-      {receipt && <div className="restock-modal-backdrop" onClick={(event) => event.target === event.currentTarget && setReceipt(null)}><div className="restock-receipt-modal"><div className="restock-receipt" id="restock-print-area"><strong>{receipt.shop}</strong><span>Purchase List</span><span>{formatDate(receipt.createdAt)}</span><hr />{receipt.items.map((item, index) => <div key={item.id}><p><span>{index + 1}. {item.name}</span>{item.price ? <b>{formatPrice(item.price)}</b> : null}</p><small>{formatQty(item)}{item.note ? ` · ${item.note}` : ''}</small></div>)}<hr /><span>Items: {receipt.items.length}</span></div><div className="restock-modal-actions"><button onClick={() => setReceipt(null)}>Close</button><button className="restock-primary-btn" onClick={() => window.print()}>Print</button></div></div></div>}
+      {receipt && <div className="restock-modal-backdrop" onClick={(event) => event.target === event.currentTarget && setReceipt(null)}><div className="restock-receipt-modal"><div className="restock-receipt" id="restock-print-area"><strong>{receipt.shop}</strong><span>Purchase List</span><span>{formatDate(receipt.createdAt)}</span><hr /><div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 64px', gap: 6, fontWeight: 700, fontSize: 12, marginBottom: 6 }}><span>Item</span><span>Date</span><span style={{ textAlign: 'right' }}>Price</span></div>{receipt.items.map((item, index) => <div key={item.id} style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}><div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 64px', gap: 6, alignItems: 'baseline' }}><span>{index + 1}. {item.name}</span><span>{formatItemDate(item.date || item.addedAt)}</span><b style={{ textAlign: 'right' }}>{item.price ? formatPrice(item.price) : '—'}</b></div><small>{formatQty(item)}{item.note ? ` · ${item.note}` : ''}</small></div>)}<hr /><span>Items: {receipt.items.length}</span></div><div className="restock-modal-actions"><button onClick={() => setReceipt(null)}>Close</button><button className="restock-primary-btn" onClick={() => window.print()}>Print</button></div></div></div>}
       {toast && <div className="restock-toast">{toast}</div>}
     </>
   );

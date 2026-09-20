@@ -2,14 +2,14 @@
 import { useState, useRef } from 'react';
 import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
-import { STORE_CATEGORIES, getProductCategory, matchesSearch, generateProductId, normalizeSearchText } from '@/lib/helpers';
+import { getProductCategory, matchesSearch, generateProductId, normalizeSearchText } from '@/lib/helpers';
 import { exportInventory, parseImportFile } from '@/lib/inventoryExcel';
 import { getProductName } from '@/lib/translations';
 import { doc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export default function InventoryPage() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, lang } = useStore();
+  const { inventory, categories, addInventoryItem, updateInventoryItem, deleteInventoryItem, lang } = useStore();
   const isTa = lang === 'ta';
   const [search,   setSearch]   = useState('');
   const [sortMode, setSortMode] = useState('id');
@@ -18,7 +18,7 @@ export default function InventoryPage() {
 
   const CAT_OPTIONS = [
     { value: 'auto', label: isTa ? 'தானியங்கி (Auto Detect)' : 'Auto Detect' },
-    ...STORE_CATEGORIES.map((c) => ({ value: c.id, label: `${c.icon} ${isTa && c.labelTa ? c.labelTa : c.label}` }))
+    ...categories.map((c) => ({ value: c.id, label: `${c.icon} ${isTa && c.labelTa ? c.labelTa : c.label}` }))
   ];
 
   // ── import state ──
@@ -50,7 +50,7 @@ export default function InventoryPage() {
   const openEdit = (p) => {
     setEditItem(p);
     // Resolve the actual current category — never show 'auto' in the dropdown
-    const resolvedCat = getProductCategory(p); // always returns a real category id
+    const resolvedCat = getProductCategory(p, categories); // always returns a real category id
     setForm({
       name:      p.name     || '',
       altName:   p.altName  || '',
@@ -74,7 +74,7 @@ export default function InventoryPage() {
       return;
     }
 
-    const oldCatId = getProductCategory(editItem);
+    const oldCatId = getProductCategory(editItem, categories);
     const newCatId = form.category && form.category !== 'auto' ? form.category : oldCatId;
     const categoryChanged = newCatId !== oldCatId;
 
@@ -85,7 +85,7 @@ export default function InventoryPage() {
         .filter((p) => p.id !== editItem.id) // exclude the current item
         .map((p) => p.productId)
         .filter(Boolean);
-      const newProductId = generateProductId(newCatId, allIds);
+      const newProductId = generateProductId(newCatId, allIds, categories);
 
       const newData = {
         productId:  newProductId,
@@ -323,7 +323,7 @@ export default function InventoryPage() {
         ) : (
           <div className="inv-list">
             {filtered.map((p) => {
-              const cat = STORE_CATEGORIES.find((c) => c.id === getProductCategory(p));
+              const cat = categories.find((c) => c.id === getProductCategory(p, categories));
               const displayName = getProductName(p, lang);
               return (
                 <div key={p.id} className="inv-row">
@@ -402,7 +402,7 @@ export default function InventoryPage() {
               <div className="modal-field">
                 <label>{isTa ? 'பிரிவு' : 'Category'}</label>
                 <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                  {STORE_CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <option key={c.id} value={c.id}>{c.icon} {isTa && c.labelTa ? c.labelTa : c.label}</option>
                   ))}
                 </select>

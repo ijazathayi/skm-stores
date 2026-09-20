@@ -4,11 +4,11 @@ import Header from '@/components/Header';
 import CartDrawer from '@/components/CartDrawer';
 import { useStore } from '@/lib/store';
 import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
-import { STORE_CATEGORIES, getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
+import { getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
 
 export default function BillPage() {
-  const { inventory, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill } = useStore();
+  const { inventory, categories, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill } = useStore();
   const isTa = lang === 'ta';
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -31,13 +31,13 @@ export default function BillPage() {
 
   // ── category counts ──
   const catCounts = {};
-  STORE_CATEGORIES.forEach((c) => { catCounts[c.id] = 0; });
-  inventory.forEach((p) => { const id = getProductCategory(p); catCounts[id] = (catCounts[id] || 0) + 1; });
+  categories.forEach((c) => { catCounts[c.id] = 0; });
+  inventory.forEach((p) => { const id = getProductCategory(p, categories); catCounts[id] = (catCounts[id] || 0) + 1; });
   catCounts['VG'] = (catCounts['VG'] || 0) + vegPrices.length;
 
   // ── sorted inventory for current category ──
   const sortedInv = [...inventory]
-    .filter((p) => getProductCategory(p) === selectedCategory || selectedCategory === 'all')
+    .filter((p) => getProductCategory(p, categories) === selectedCategory || selectedCategory === 'all')
     .sort((a, b) => {
       if (sortMode === 'az') return (getProductName(a, lang) || '').localeCompare(getProductName(b, lang) || '');
       if (sortMode === 'price') return (Number(b.price) || 0) - (Number(a.price) || 0);
@@ -80,7 +80,7 @@ export default function BillPage() {
     }
   };
 
-  const cat = STORE_CATEGORIES.find((c) => c.id === selectedCategory);
+  const cat = categories.find((c) => c.id === selectedCategory);
   const catLabel = cat ? (isTa && cat.labelTa ? cat.labelTa : cat.label) : '';
 
   return (
@@ -126,7 +126,7 @@ export default function BillPage() {
         {/* category view */}
         {!q && selectedCategory === 'all' && (
           <div className="cat-grid">
-            {STORE_CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <button key={c.id} className="cat-card" onClick={() => setSelectedCategory(c.id)}>
                 <span className="cat-icon">{c.icon}</span>
                 <span className="cat-name">{isTa && c.labelTa ? c.labelTa : c.label}</span>

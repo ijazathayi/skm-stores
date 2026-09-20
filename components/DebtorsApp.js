@@ -371,24 +371,17 @@ export default function DebtorsApp({ customerId = null }) {
     for (const [pageIndex, pageEntries] of chunks.entries()) {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;padding:44px;background:#fff;color:#24170f;font-family:Arial,sans-serif;';
-      const title = messageIsTa ? 'கடன் கணக்கு விவரம்' : 'DEBT ACCOUNT STATEMENT';
       const customerLabel = messageIsTa ? 'வாடிக்கையாளர்' : 'Customer';
-      const dateLabel = messageIsTa ? 'தேதி' : 'Date';
       const itemLabel = messageIsTa ? 'பொருள்' : 'Product';
       const qtyLabel = messageIsTa ? 'அளவு' : 'Qty';
       const amountLabel = messageIsTa ? 'விலை' : 'Amount';
       const paidLabel = messageIsTa ? 'செலுத்தியது' : 'Payment';
       const outstandingLabel = messageIsTa ? 'மீதம் செலுத்த வேண்டியது' : 'Outstanding balance';
       wrapper.innerHTML = `<div style="border:3px solid #493326;padding:28px;background:#fffdf9;">
-        <div style="font-size:30px;font-weight:800;color:#493326;">SKM STORES</div>
-        <div style="font-size:22px;font-weight:700;margin-top:8px;">${title}</div>
-        <div style="font-size:20px;margin-top:18px;"><b>${customerLabel}:</b> ${escapeHtml(currentCustomer.name)}</div>
-        <div style="font-size:18px;margin-top:6px;"><b>${dateLabel}:</b> ${fmtDate(today())}</div>
-        <div style="height:2px;background:#d7b88d;margin:22px 0 14px;"></div>
-        ${messageMode === 'details' ? `<table style="width:100%;border-collapse:collapse;font-size:18px;"><thead><tr style="background:#f5e7d0;"><th style="padding:12px;text-align:left;">${dateLabel}</th><th style="padding:12px;text-align:left;">${itemLabel}</th><th style="padding:12px;text-align:center;">${qtyLabel}</th><th style="padding:12px;text-align:right;">${amountLabel}</th></tr></thead><tbody>${pageEntries.map((entry) => entry.kind === 'debt'
-          ? `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${fmtDate(entry.date)}</td><td style="padding:12px;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.product || 'Purchase')}</td><td style="padding:12px;text-align:center;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.qty || '-')}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">${money(entry.amount)}</td></tr>`
-          : `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${fmtDate(entry.date)}</td><td colspan="2" style="padding:12px;border-bottom:1px solid #eadbc6;">${paidLabel}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">-${money(entry.amount)}</td></tr>`).join('')}</tbody></table>` : `<div style="font-size:26px;padding:24px 0;">${messageIsTa ? 'நிலுவைத் தொகை' : 'Amount currently due'}</div>`}
-        <div style="margin-top:24px;padding:18px;background:#493326;color:#fff;font-size:26px;font-weight:800;text-align:right;">${outstandingLabel}: ${money(balance)}</div>
+        <div style="font-size:30px;font-weight:800;color:#493326;text-align:center;">SKM STORES</div>
+        <div style="font-size:20px;margin-top:24px;padding-bottom:14px;border-bottom:2px solid #d7b88d;"><b>${customerLabel}:</b> ${escapeHtml(currentCustomer.name)}</div>
+        ${messageMode === 'details' ? `<table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:14px;"><thead><tr style="background:#f5e7d0;"><th style="padding:12px;text-align:left;">${itemLabel}</th><th style="padding:12px;text-align:center;">${qtyLabel}</th><th style="padding:12px;text-align:right;">${amountLabel}</th></tr></thead><tbody>${pageEntries.filter((entry) => entry.kind === 'debt').map((entry) => `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.product || 'Purchase')}</td><td style="padding:12px;text-align:center;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.qty || '-')}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">${money(entry.amount)}</td></tr>`).join('')}</tbody></table>` : `<div style="font-size:26px;padding:24px 0;">${messageIsTa ? 'நிலுவைத் தொகை' : 'Amount currently due'}</div>`}
+        <div style="margin-top:24px;padding-top:16px;border-top:2px solid #d7b88d;font-size:26px;font-weight:800;text-align:right;">${outstandingLabel}: ${money(balance)}</div>
         ${chunks.length > 1 ? `<div style="font-size:16px;margin-top:18px;text-align:center;color:#80664d;">${pageIndex + 1} / ${chunks.length}</div>` : ''}
       </div>`;
       document.body.appendChild(wrapper);

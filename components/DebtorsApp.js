@@ -349,9 +349,11 @@ export default function DebtorsApp({ customerId = null }) {
     if (!currentCustomer) return [];
     const { default: html2canvas } = await import('html2canvas');
     const allEntries = getCurrentDebtCycle(getCustomerEntries(currentCustomer.id));
-    const entriesToRender = messageMode === 'details' ? allEntries : [];
+    const entriesToRender = messageMode === 'details'
+      ? allEntries.filter((entry) => entry.kind === 'debt')
+      : [];
     const chunks = [];
-    const pageSize = 8;
+    const pageSize = 20;
     if (!entriesToRender.length) chunks.push([]);
     for (let index = 0; index < entriesToRender.length; index += pageSize) {
       chunks.push(entriesToRender.slice(index, index + pageSize));
@@ -362,6 +364,7 @@ export default function DebtorsApp({ customerId = null }) {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = 'position:fixed;left:-10000px;top:0;width:760px;padding:44px;background:#fff;color:#24170f;font-family:Arial,sans-serif;';
       const customerLabel = messageIsTa ? 'வாடிக்கையாளர்' : 'Customer';
+      const dateLabel = messageIsTa ? 'தேதி' : 'Date';
       const itemLabel = messageIsTa ? 'பொருள்' : 'Product';
       const qtyLabel = messageIsTa ? 'அளவு' : 'Qty';
       const amountLabel = messageIsTa ? 'விலை' : 'Amount';
@@ -370,7 +373,7 @@ export default function DebtorsApp({ customerId = null }) {
       wrapper.innerHTML = `<div style="border:3px solid #493326;padding:28px;background:#fffdf9;">
         <div style="font-size:30px;font-weight:800;color:#493326;text-align:center;">SKM STORES</div>
         <div style="font-size:20px;margin-top:24px;padding-bottom:14px;border-bottom:2px solid #d7b88d;"><b>${customerLabel}:</b> ${escapeHtml(currentCustomer.name)}</div>
-        ${messageMode === 'details' ? `<table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:14px;"><thead><tr style="background:#f5e7d0;"><th style="padding:12px;text-align:left;">${itemLabel}</th><th style="padding:12px;text-align:center;">${qtyLabel}</th><th style="padding:12px;text-align:right;">${amountLabel}</th></tr></thead><tbody>${pageEntries.filter((entry) => entry.kind === 'debt').map((entry) => `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.product || 'Purchase')}</td><td style="padding:12px;text-align:center;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.qty || '-')}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">${money(entry.amount)}</td></tr>`).join('')}</tbody></table>` : `<div style="font-size:26px;padding:24px 0;">${messageIsTa ? 'நிலுவைத் தொகை' : 'Amount currently due'}</div>`}
+        ${messageMode === 'details' ? `<table style="width:100%;border-collapse:collapse;font-size:18px;margin-top:14px;"><thead><tr style="background:#f5e7d0;"><th style="width:19%;padding:12px;text-align:left;">${dateLabel}</th><th style="width:43%;padding:12px;text-align:left;">${itemLabel}</th><th style="width:14%;padding:12px;text-align:center;">${qtyLabel}</th><th style="width:24%;padding:12px;text-align:right;">${amountLabel}</th></tr></thead><tbody>${pageEntries.map((entry) => `<tr><td style="padding:12px;border-bottom:1px solid #eadbc6;white-space:nowrap;">${fmtDate(entry.date)}</td><td style="padding:12px;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.product || 'Purchase')}</td><td style="padding:12px;text-align:center;border-bottom:1px solid #eadbc6;">${escapeHtml(entry.qty || '-')}</td><td style="padding:12px;text-align:right;border-bottom:1px solid #eadbc6;">${money(entry.amount)}</td></tr>`).join('')}</tbody></table>` : `<div style="font-size:26px;padding:24px 0;">${messageIsTa ? 'நிலுவைத் தொகை' : 'Amount currently due'}</div>`}
         <div style="margin-top:24px;padding-top:16px;border-top:2px solid #d7b88d;font-size:26px;font-weight:800;text-align:right;">${outstandingLabel}: ${money(balance)}</div>
         ${chunks.length > 1 ? `<div style="font-size:16px;margin-top:18px;text-align:center;color:#80664d;">${pageIndex + 1} / ${chunks.length}</div>` : ''}
       </div>`;

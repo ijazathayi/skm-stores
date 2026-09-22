@@ -710,14 +710,7 @@ export default function AgencyOrderApp() {
             <div style={{ color: '#8a6a4f', fontSize: 13 }}>
               {orderView === 'all' ? 'Select products and quantities' : 'Arrange the selected lines before printing'}
             </div>
-            <div style={{ display: 'inline-flex', border: '1px solid rgba(122,84,48,.22)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
-              <button type="button" onClick={() => setOrderView('all')} style={{ ...orderViewBtn, ...(orderView === 'all' ? orderViewActiveBtn : {}) }}>
-                All products
-              </button>
-              <button type="button" onClick={() => setOrderView('selected')} disabled={!currentLines.length} style={{ ...orderViewBtn, ...(orderView === 'selected' ? orderViewActiveBtn : {}) }}>
-                Selected lines ({currentLines.length})
-              </button>
-            </div>
+            {orderView === 'selected' && <button type="button" onClick={() => setOrderView('all')} style={topbarBtn}>Add more products</button>}
           </div>
 
           {orderView === 'all' ? <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
@@ -775,19 +768,9 @@ export default function AgencyOrderApp() {
           {orderView === 'all' && currentLines.length > 0 && (
             <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(194,65,12,.22)', borderRadius: 14, background: 'rgba(255,248,237,.78)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
-                <strong style={{ fontSize: 14 }}>Image order</strong>
-                <span style={{ color: '#8a6a4f', fontSize: 12 }}>Move items into the order you want</span>
-              </div>
-              <div style={{ display: 'grid', gap: 7 }}>
-                {currentLines.map((line, index) => (
-                  <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', background: '#fff', border: '1px solid rgba(122,84,48,.14)', borderRadius: 9 }}>
-                    <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
-                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
-                    <span style={{ color: '#8a6a4f', fontSize: 12 }}>{line.qty} {esc(line.unit)}</span>
-                    <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} style={orderMoveBtn}>&uarr;</button>
-                    <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} style={orderMoveBtn}>&darr;</button>
-                  </div>
-                ))}
+                <strong style={{ fontSize: 14 }}>{currentLines.length} products selected</strong>
+                <button type="button" onClick={() => setOrderView('selected')} style={brandBtn}>Show bill</button>
+                <span style={{ color: '#8a6a4f', fontSize: 12 }}>Review the bill and arrange lines next</span>
               </div>
             </div>
           )}
@@ -806,19 +789,19 @@ export default function AgencyOrderApp() {
         <div style={sheetFooterStyle}>
           <button onClick={() => setOrderModal(false)} style={topbarBtn}>Close</button>
           <button onClick={() => { setCart({}); setLineOrder([]); }} style={topbarBtn}>Clear</button>
-          <button onClick={() => shareImage(orderAgencyId, cart, priceMode, lineOrder)} style={topbarBtn}>Save / share image</button>
-          <button onClick={() => {
-            const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
-            if (!d.lines.length) return showToast('Select at least one product');
-            const w = prompt('Thermal paper width in mm (58 or 80)?', '80');
-            if (!w) return;
-            printHTML(thermalTemplate(d, Math.max(40, parseInt(w, 10) || 80)));
-          }} style={topbarBtn}>Thermal print</button>
-          <button onClick={() => {
-            const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
-            if (!d.lines.length) return showToast('Select at least one product');
-            printHTML(a4Template(d));
-          }} style={brandBtn}>Print A4</button>
+          {orderView === 'selected' && <>
+            <button onClick={() => shareImage(orderAgencyId, cart, priceMode, lineOrder)} style={topbarBtn}>Save / share image</button>
+            <button onClick={() => {
+              const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
+              const w = prompt('Thermal paper width in mm (58 or 80)?', '80');
+              if (!w) return;
+              printHTML(thermalTemplate(d, Math.max(40, parseInt(w, 10) || 80)));
+            }} style={topbarBtn}>Thermal print</button>
+            <button onClick={() => {
+              const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
+              printHTML(a4Template(d));
+            }} style={brandBtn}>Print A4</button>
+          </>}
         </div>
       </Modal>
 
@@ -833,8 +816,6 @@ const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.
 const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.85)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 16px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
-const orderViewBtn = { border: 0, background: 'transparent', color: '#3a2415', padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700 };
-const orderViewActiveBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff' };
 const orderMoveBtn = { width: 30, height: 30, padding: 0, border: '1px solid rgba(122,84,48,.2)', borderRadius: 7, background: '#fffdfa', color: '#3a2415', cursor: 'pointer', fontSize: 16, lineHeight: 1 };
 const smBtn = { border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#3a2415' };
 const primarySmBtn = { ...smBtn, background: 'linear-gradient(135deg,#c2410c,#e8b04b)', border: '1px solid transparent', color: '#fff' };

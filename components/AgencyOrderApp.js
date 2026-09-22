@@ -108,6 +108,7 @@ export default function AgencyOrderApp() {
   const [priceMode, setPriceMode] = useState('wholesale');
   const [cart, setCart] = useState({});
   const [lineOrder, setLineOrder] = useState([]);
+  const [orderView, setOrderView] = useState('all');
 
   // Firestore Realtime Listener
   useEffect(() => {
@@ -289,6 +290,7 @@ export default function AgencyOrderApp() {
     setPriceMode('wholesale');
     setCart({});
     setLineOrder([]);
+    setOrderView('all');
     setOrderModal(true);
   }
 
@@ -704,7 +706,21 @@ export default function AgencyOrderApp() {
           </div>
         </div>
         <div style={{ padding: '20px 22px' }}>
-          <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ color: '#8a6a4f', fontSize: 13 }}>
+              {orderView === 'all' ? 'Select products and quantities' : 'Arrange the selected lines before printing'}
+            </div>
+            <div style={{ display: 'inline-flex', border: '1px solid rgba(122,84,48,.22)', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+              <button type="button" onClick={() => setOrderView('all')} style={{ ...orderViewBtn, ...(orderView === 'all' ? orderViewActiveBtn : {}) }}>
+                All products
+              </button>
+              <button type="button" onClick={() => setOrderView('selected')} disabled={!currentLines.length} style={{ ...orderViewBtn, ...(orderView === 'selected' ? orderViewActiveBtn : {}) }}>
+                Selected lines ({currentLines.length})
+              </button>
+            </div>
+          </div>
+
+          {orderView === 'all' ? <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
               <thead>
                 <tr>
@@ -742,9 +758,21 @@ export default function AgencyOrderApp() {
                 })}
               </tbody>
             </table>
-          </div>
+          </div> : (
+            <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
+              {currentLines.length ? currentLines.map((line, index) => (
+                <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: '1px solid rgba(122,84,48,.14)', borderRadius: 9 }}>
+                  <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
+                  <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />
+                  <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} style={orderMoveBtn}>&uarr;</button>
+                  <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} style={orderMoveBtn}>&darr;</button>
+                </div>
+              )) : <div style={{ padding: 22, color: '#8a6a4f', textAlign: 'center' }}>Select products first.</div>}
+            </div>
+          )}
 
-          {currentLines.length > 0 && (
+          {orderView === 'all' && currentLines.length > 0 && (
             <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(194,65,12,.22)', borderRadius: 14, background: 'rgba(255,248,237,.78)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
                 <strong style={{ fontSize: 14 }}>Image order</strong>
@@ -805,6 +833,8 @@ const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.
 const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.85)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 16px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+const orderViewBtn = { border: 0, background: 'transparent', color: '#3a2415', padding: '8px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 700 };
+const orderViewActiveBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff' };
 const orderMoveBtn = { width: 30, height: 30, padding: 0, border: '1px solid rgba(122,84,48,.2)', borderRadius: 7, background: '#fffdfa', color: '#3a2415', cursor: 'pointer', fontSize: 16, lineHeight: 1 };
 const smBtn = { border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#3a2415' };
 const primarySmBtn = { ...smBtn, background: 'linear-gradient(135deg,#c2410c,#e8b04b)', border: '1px solid transparent', color: '#fff' };

@@ -107,6 +107,7 @@ export default function AgencyOrderApp() {
   const [orderAgencyId, setOrderAgencyId] = useState(null);
   const [priceMode, setPriceMode] = useState('wholesale');
   const [cart, setCart] = useState({});
+  const [lineOrder, setLineOrder] = useState([]);
 
   // Firestore Realtime Listener
   useEffect(() => {
@@ -287,24 +288,55 @@ export default function AgencyOrderApp() {
     setOrderAgencyId(agencyId);
     setPriceMode('wholesale');
     setCart({});
+    setLineOrder([]);
     setOrderModal(true);
   }
 
-  function cartLines(agencyId, currentCart, mode) {
+  function updateCartQuantity(productId, value) {
+    setCart((current) => {
+      const next = { ...current };
+      if (!value || value <= 0) delete next[productId];
+      else next[productId] = value;
+      return next;
+    });
+    setLineOrder((current) => {
+      if (value > 0 && !current.includes(productId)) return [...current, productId];
+      if (value <= 0) return current.filter((id) => id !== productId);
+      return current;
+    });
+  }
+
+  function moveLine(lineId, direction) {
+    setLineOrder((current) => {
+      const index = current.indexOf(lineId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
+  function cartLines(agencyId, currentCart, mode, orderedIds = []) {
     const a = agency(agencyId);
     if (!a || !Array.isArray(a.products)) return [];
-    return a.products
+    const productsById = new Map(a.products.map((p) => [p.id, p]));
+    const selectedProducts = [
+      ...orderedIds.map((id) => productsById.get(id)).filter(Boolean),
+      ...a.products.filter((p) => currentCart[p.id] > 0 && !orderedIds.includes(p.id))
+    ];
+    return selectedProducts
       .filter((p) => currentCart[p.id] > 0)
       .map((p) => {
         const rate = +(mode === 'retail' ? p.retail : p.wholesale) || 0;
         const qty = currentCart[p.id];
-        return { name: p.name, unit: p.unit || '', rate, qty, amount: qty * rate };
+        return { id: p.id, name: p.name, unit: p.unit || '', rate, qty, amount: qty * rate };
       });
   }
 
-  function orderData(agencyId, currentCart, mode) {
+  function orderData(agencyId, currentCart, mode, orderedIds = []) {
     const a = agency(agencyId);
-    const lines = cartLines(agencyId, currentCart, mode);
+    const lines = cartLines(agencyId, currentCart, mode, orderedIds);
     return {
       agency: a,
       lines,
@@ -365,8 +397,8 @@ export default function AgencyOrderApp() {
   }
 
   /* ── image share ── */
-  async function shareImage(agencyId, currentCart, mode) {
-    const d = orderData(agencyId, currentCart, mode);
+  async function shareImage(agencyId, currentCart, mode, orderedIds) {
+    const d = orderData(agencyId, currentCart, mode, orderedIds);
     if (!d.lines.length) return showToast('Select at least one product');
     const W = 760, pad = 36, rowH = 34, head = 190, foot = 150;
     const canvas = document.createElement('canvas');
@@ -417,7 +449,7 @@ export default function AgencyOrderApp() {
   }
 
   /* ── order panel calculations ── */
-  const currentLines = orderModal ? cartLines(orderAgencyId, cart, priceMode) : [];
+  const currentLines = orderModal ? cartLines(orderAgencyId, cart, priceMode, lineOrder) : [];
   const orderCount = currentLines.length;
   const orderQty = currentLines.reduce((s, l) => s + l.qty, 0);
   const orderTotal = currentLines.reduce((s, l) => s + l.amount, 0);
@@ -699,12 +731,7 @@ export default function AgencyOrderApp() {
                           placeholder="0"
                           onChange={(e) => {
                             const v = parseFloat(e.target.value);
-                            setCart((c) => {
-                              const next = { ...c };
-                              if (!v || v <= 0) delete next[p.id];
-                              else next[p.id] = v;
-                              return next;
-                            });
+                            updateCartQuantity(p.id, v);
                           }}
                           style={{ width: 80, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }}
                         />
@@ -716,6 +743,26 @@ export default function AgencyOrderApp() {
               </tbody>
             </table>
           </div>
+
+          {currentLines.length > 0 && (
+            <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(194,65,12,.22)', borderRadius: 14, background: 'rgba(255,248,237,.78)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+                <strong style={{ fontSize: 14 }}>Image order</strong>
+                <span style={{ color: '#8a6a4f', fontSize: 12 }}>Move items into the order you want</span>
+              </div>
+              <div style={{ display: 'grid', gap: 7 }}>
+                {currentLines.map((line, index) => (
+                  <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px', background: '#fff', border: '1px solid rgba(122,84,48,.14)', borderRadius: 9 }}>
+                    <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
+                    <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
+                    <span style={{ color: '#8a6a4f', fontSize: 12 }}>{line.qty} {esc(line.unit)}</span>
+                    <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} style={orderMoveBtn}>&uarr;</button>
+                    <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} style={orderMoveBtn}>&darr;</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ maxWidth: 340, marginLeft: 'auto', marginTop: 16 }}>
             {[['Items selected', orderCount], ['Total quantity', orderQty]].map(([label, val]) => (
@@ -730,17 +777,17 @@ export default function AgencyOrderApp() {
         </div>
         <div style={sheetFooterStyle}>
           <button onClick={() => setOrderModal(false)} style={topbarBtn}>Close</button>
-          <button onClick={() => setCart({})} style={topbarBtn}>Clear</button>
-          <button onClick={() => shareImage(orderAgencyId, cart, priceMode)} style={topbarBtn}>Save / share image</button>
+          <button onClick={() => { setCart({}); setLineOrder([]); }} style={topbarBtn}>Clear</button>
+          <button onClick={() => shareImage(orderAgencyId, cart, priceMode, lineOrder)} style={topbarBtn}>Save / share image</button>
           <button onClick={() => {
-            const d = orderData(orderAgencyId, cart, priceMode);
+            const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
             if (!d.lines.length) return showToast('Select at least one product');
             const w = prompt('Thermal paper width in mm (58 or 80)?', '80');
             if (!w) return;
             printHTML(thermalTemplate(d, Math.max(40, parseInt(w, 10) || 80)));
           }} style={topbarBtn}>Thermal print</button>
           <button onClick={() => {
-            const d = orderData(orderAgencyId, cart, priceMode);
+            const d = orderData(orderAgencyId, cart, priceMode, lineOrder);
             if (!d.lines.length) return showToast('Select at least one product');
             printHTML(a4Template(d));
           }} style={brandBtn}>Print A4</button>
@@ -758,6 +805,7 @@ const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.
 const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.85)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 16px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
+const orderMoveBtn = { width: 30, height: 30, padding: 0, border: '1px solid rgba(122,84,48,.2)', borderRadius: 7, background: '#fffdfa', color: '#3a2415', cursor: 'pointer', fontSize: 16, lineHeight: 1 };
 const smBtn = { border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#3a2415' };
 const primarySmBtn = { ...smBtn, background: 'linear-gradient(135deg,#c2410c,#e8b04b)', border: '1px solid transparent', color: '#fff' };
 const dangerSmBtn = { ...smBtn, color: '#a8321c', borderColor: 'rgba(168,50,28,.25)', background: 'rgba(168,50,28,.06)' };

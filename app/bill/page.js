@@ -85,7 +85,11 @@ export default function BillPage() {
 
   return (
     <>
-      <Header backHref="/" title={editingBill ? (isTa ? `📝 ரசீது #${editingBill.billNo} திருத்தம்` : `📝 Edit Bill #${editingBill.billNo}`) : (isTa ? '🧾 புதிய ரசீது' : '🧾 New Bill')} />
+      <Header
+        backHref={selectedCategory === 'all' ? '/' : undefined}
+        onBack={selectedCategory !== 'all' ? () => setSelectedCategory('all') : undefined}
+        title={editingBill ? (isTa ? `📝 ரசீது #${editingBill.billNo} திருத்தம்` : `📝 Edit Bill #${editingBill.billNo}`) : (isTa ? '🧾 புதிய ரசீது' : '🧾 New Bill')}
+      />
       <main className="wrap">
         {/* search */}
         <div className="search-wrap">

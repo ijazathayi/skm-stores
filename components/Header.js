@@ -6,7 +6,7 @@ import { money } from '@/lib/helpers';
 import { t } from '@/lib/translations';
 import { useAuth } from '@/components/AuthProvider';
 
-export default function Header({ backHref, title, showLangToggle = true }) {
+export default function Header({ backHref, onBack, title, showLangToggle = true }) {
   const { connected, todaySales, lang, setLang } = useStore();
   const { user, role, signOut } = useAuth();
   const isTa = lang === 'ta';
@@ -18,8 +18,16 @@ export default function Header({ backHref, title, showLangToggle = true }) {
       maxWidth: 900, margin: '0 auto'
     }}>
       <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {backHref ? (
-          <Link href={backHref} style={{
+        {backHref || onBack ? (
+          onBack ? (
+            <button type="button" onClick={onBack} style={{
+              background: 'transparent', border: 'none', fontSize: 15, fontWeight: 700,
+              color: 'var(--primary-dark)', cursor: 'pointer', textDecoration: 'none',
+              display: 'flex', alignItems: 'center', gap: 6, minHeight: 36
+            }}>
+              ← {t('home', lang)}
+            </button>
+          ) : <Link href={backHref} style={{
             background: 'transparent', border: 'none', fontSize: 15, fontWeight: 700,
             color: 'var(--primary-dark)', cursor: 'pointer', textDecoration: 'none',
             display: 'flex', alignItems: 'center', gap: 6, minHeight: 36

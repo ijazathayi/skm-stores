@@ -760,6 +760,10 @@ export default function AgencyOrderApp() {
                   key={line.id}
                   draggable
                   onDragStart={(event) => {
+                    if (!event.target.closest('[data-drag-handle]')) {
+                      event.preventDefault();
+                      return;
+                    }
                     event.dataTransfer.effectAllowed = 'move';
                     event.dataTransfer.setData('text/plain', line.id);
                     setDraggedLineId(line.id);
@@ -773,6 +777,9 @@ export default function AgencyOrderApp() {
                   style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: `1px solid ${draggedLineId === line.id ? '#c2410c' : 'rgba(122,84,48,.14)'}`, borderRadius: 9, cursor: 'grab', opacity: draggedLineId === line.id ? 0.55 : 1, transition: 'border-color .15s, opacity .15s' }}
                   aria-label={`Drag ${line.name} to reorder`}
                 >
+                  <span data-drag-handle aria-label={`Drag ${line.name} to reorder`} title="Drag to reorder" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, padding: 4, margin: -4, cursor: 'grab' }}>
+                    {Array.from({ length: 6 }, (_, dotIndex) => <span key={dotIndex} style={{ width: 3, height: 3, borderRadius: '50%', background: '#8a6a4f' }} />)}
+                  </span>
                   <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
                   <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />

@@ -108,6 +108,7 @@ export default function AgencyOrderApp() {
   const [priceMode, setPriceMode] = useState('wholesale');
   const [cart, setCart] = useState({});
   const [lineOrder, setLineOrder] = useState([]);
+  const [draggedLineId, setDraggedLineId] = useState(null);
   const [orderView, setOrderView] = useState('all');
 
   // Firestore Realtime Listener
@@ -308,13 +309,14 @@ export default function AgencyOrderApp() {
     });
   }
 
-  function moveLine(lineId, direction) {
+  function reorderLine(lineId, targetLineId) {
     setLineOrder((current) => {
-      const index = current.indexOf(lineId);
-      const nextIndex = index + direction;
-      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const fromIndex = current.indexOf(lineId);
+      const targetIndex = current.indexOf(targetLineId);
+      if (fromIndex < 0 || targetIndex < 0 || fromIndex === targetIndex) return current;
       const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      next.splice(fromIndex, 1);
+      next.splice(targetIndex - (fromIndex < targetIndex ? 1 : 0), 0, lineId);
       return next;
     });
   }
@@ -754,12 +756,26 @@ export default function AgencyOrderApp() {
           </div> : (
             <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
               {currentLines.length ? currentLines.map((line, index) => (
-                <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: '1px solid rgba(122,84,48,.14)', borderRadius: 9 }}>
+                <div
+                  key={line.id}
+                  draggable
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', line.id);
+                    setDraggedLineId(line.id);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    const sourceLineId = draggedLineId || event.dataTransfer.getData('text/plain');
+                    if (sourceLineId) reorderLine(sourceLineId, line.id);
+                  }}
+                  onDragEnd={() => setDraggedLineId(null)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: `1px solid ${draggedLineId === line.id ? '#c2410c' : 'rgba(122,84,48,.14)'}`, borderRadius: 9, cursor: 'grab', opacity: draggedLineId === line.id ? 0.55 : 1, transition: 'border-color .15s, opacity .15s' }}
+                  aria-label={`Drag ${line.name} to reorder`}
+                >
                   <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
                   <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />
-                  <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} style={orderMoveBtn}>&uarr;</button>
-                  <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} style={orderMoveBtn}>&darr;</button>
                 </div>
               )) : <div style={{ padding: 22, color: '#8a6a4f', textAlign: 'center' }}>Select products first.</div>}
             </div>
@@ -816,7 +832,6 @@ const labelStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.
 const fieldStyle = { width: '100%', padding: '11px 13px', borderRadius: 12, border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.85)', fontFamily: 'inherit', fontSize: 14, color: '#3a2415', boxSizing: 'border-box' };
 const brandBtn = { background: 'linear-gradient(135deg,#c2410c,#e8b04b)', color: '#fff', fontWeight: 600, borderRadius: 12, padding: '11px 16px', border: '1px solid transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, boxShadow: '0 10px 22px rgba(194,65,12,.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
 const topbarBtn = { background: 'rgba(255,255,255,.72)', border: '1px solid rgba(122,84,48,.18)', color: '#3a2415', fontWeight: 600, borderRadius: 12, padding: '11px 14px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' };
-const orderMoveBtn = { width: 30, height: 30, padding: 0, border: '1px solid rgba(122,84,48,.2)', borderRadius: 7, background: '#fffdfa', color: '#3a2415', cursor: 'pointer', fontSize: 16, lineHeight: 1 };
 const smBtn = { border: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,255,255,.8)', borderRadius: 9, padding: '6px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 13, color: '#3a2415' };
 const primarySmBtn = { ...smBtn, background: 'linear-gradient(135deg,#c2410c,#e8b04b)', border: '1px solid transparent', color: '#fff' };
 const dangerSmBtn = { ...smBtn, color: '#a8321c', borderColor: 'rgba(168,50,28,.25)', background: 'rgba(168,50,28,.06)' };

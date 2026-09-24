@@ -42,6 +42,7 @@ body {
 input, select, button { font-family: inherit; }
 input, select {
   width: 100%;
+  min-height: 48px;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--border);
@@ -207,6 +208,10 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 .inv-row:last-child { border-bottom: none; }
 .inv-add-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.form-field > span { color: var(--ink2); font-size: 12px; font-weight: 800; }
+.form-field em { color: var(--ink3); font-size: 11px; font-style: normal; font-weight: 500; }
+.form-field-wide { grid-column: 1 / -1; }
 .inv-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 
 /* ── restock callout on homepage ── */
@@ -246,6 +251,12 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* ── home grid cards ── */
 .home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.home-link { display: block; min-width: 0; text-decoration: none; }
+.home-intro { margin: 8px 0 18px; }
+.home-intro h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(24px, 4vw, 34px); line-height: 1.1; }
+.home-intro p { margin: 7px 0 0; color: var(--ink2); line-height: 1.45; }
+.home-eyebrow { margin: 0 0 5px !important; color: var(--primary-dark) !important; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; }
+.home-section-title { margin: 0 0 10px; font-size: 14px; color: var(--ink2); }
 .home-card {
   background: linear-gradient(145deg, var(--card), #fff7f0); border: 1.5px solid var(--border); border-radius: 14px;
   padding: 18px 10px 14px; display: flex; flex-direction: column; align-items: center;
@@ -313,6 +324,7 @@ input[type="number"] { -moz-appearance: textfield; }
 .restock-add-form input:nth-of-type(3) { grid-column: 1 / 3; }
 .restock-add-form button { grid-column: 3 / -1; }
 .restock-add-form input, .restock-add-form select, .restock-batch-bar input { min-width: 0; }
+.restock-add-form .form-field { min-width: 0; }
 .restock-primary-btn { background: var(--primary); color: #fff; }
 .restock-primary-btn:disabled { opacity: .45; cursor: not-allowed; }
 .restock-list { border-top: 1px solid var(--border); }
@@ -397,9 +409,9 @@ input[type="number"] { -moz-appearance: textfield; }
 /* ── floating cart FAB ── */
 .cart-fab {
   position: fixed; bottom: max(24px, env(safe-area-inset-bottom, 24px)); right: 20px; z-index: 100;
-  width: 64px; height: 64px; border-radius: 50%;
+  min-width: 64px; height: 56px; border-radius: 999px; padding: 0 18px;
   background: var(--primary); color: #fff; border: none; font-size: 26px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
   box-shadow: 0 4px 22px rgba(0,0,0,.28); transition: transform .15s, background .15s;
   -webkit-tap-highlight-color: transparent;
 }
@@ -411,6 +423,7 @@ input[type="number"] { -moz-appearance: textfield; }
   display: flex; align-items: center; justify-content: center;
   border: 2px solid #fff; pointer-events: none;
 }
+.cart-fab-label { font-size: 14px; font-weight: 800; }
 
 /* ── drawer ── */
 .drawer-overlay {
@@ -551,9 +564,12 @@ input[type="number"] { -moz-appearance: textfield; }
 }
 
 @media (max-width: 480px) {
-  header { flex-direction: column; align-items: stretch; gap: 8px; }
-  .header-right { justify-content: space-between; }
-  .home-grid { grid-template-columns: 1fr; gap: 10px; }
+  .app-header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .header-right { justify-content: space-between; gap: 6px; }
+  .header-role { display: none; }
+  .home-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .home-card { min-height: 112px; }
+  .home-link-primary:first-child { grid-column: 1 / -1; }
   .product-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .modal-body { padding: 14px 16px; }

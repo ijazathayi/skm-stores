@@ -21,7 +21,7 @@ export default function CartDrawer({ open, onClose, onComplete }) {
   return (
     <>
       <div className="drawer-overlay" onClick={onClose} />
-      <div className="cart-drawer">
+      <div className="cart-drawer" role="dialog" aria-modal="true" aria-label={isTa ? 'தற்போதைய ரசீது' : 'Current bill'}>
         {/* head */}
         <div className="drawer-head">
           <div style={{ fontFamily: 'Georgia,serif', fontSize: 17, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>

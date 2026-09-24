@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useEffect, useCallback, useState } from 'react';
-import Link from 'next/link';
+import Header from '@/components/Header';
 import { useStore } from '@/lib/store';
 
 /* ─────────────────────────────────────────────
@@ -15,24 +15,11 @@ const CSS = `
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  padding: 24px 16px 80px;
+  padding: 0 16px 80px;
   font-family: sans-serif;
-  background-color: #f4f4f9;
+  background: transparent;
   overflow-x: hidden;
 }
-
-.bm-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 15px;
-  font-weight: 700;
-  color: #007bff;
-  text-decoration: none;
-  margin-bottom: 16px;
-  align-self: flex-start;
-}
-.bm-back:hover { text-decoration: underline; }
 
 #bm-bill-wrapper {
   display: flex;
@@ -49,7 +36,7 @@ const CSS = `
 
 #bm-shop-header {
   width: 100%;
-  background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+  background: linear-gradient(135deg, var(--secondary-dark) 0%, var(--secondary) 100%);
   color: #ffffff;
   text-align: center;
   padding: 16px 12px 12px;
@@ -102,7 +89,7 @@ const CSS = `
   white-space: nowrap;
 }
 #bm-myTable th {
-  background-color: #007bff;
+  background-color: var(--primary);
   color: white;
 }
 
@@ -137,7 +124,7 @@ const CSS = `
   transition: background-color 0.2s, transform 0.15s;
   touch-action: manipulation;
 }
-.bm-download-btn:hover { background-color: #0056b3; }
+.bm-download-btn:hover { background-color: var(--primary-dark); }
 .bm-download-btn:active { transform: scale(0.97); }
 
 @media (max-width: 768px) {
@@ -334,10 +321,9 @@ export default function BuyMilk() {
   return (
     <>
       <style>{CSS}</style>
+      <Header backHref="/" title={isTa ? '🥛 பால் கொள்முதல்' : '🥛 Buy Milk'} />
 
       <div className="bm-root">
-        <Link href="/" className="bm-back">← {isTa ? 'முகப்பு' : 'Back'}</Link>
-
         {/* ── Bill wrapper (captured as image) ── */}
         <div id="bm-bill-wrapper">
 

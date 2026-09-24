@@ -77,10 +77,16 @@ export default function Home() {
     <>
       <Header />
       <main className="wrap" style={{ paddingTop: 12 }}>
+        <section className="home-intro">
+          <p className="home-eyebrow">{isTa ? 'இன்றைய வேலை' : "Today's work"}</p>
+          <h1>{isTa ? 'கடையை நிர்வகிக்கவும்' : 'What do you need to do?'}</h1>
+          <p>{isTa ? 'அடிக்கடி பயன்படுத்தும் செயல்களை முதலில் தேர்வு செய்யவும்.' : 'Start with a common task, or open more tools below.'}</p>
+        </section>
+        <h2 className="home-section-title">{isTa ? 'விரைவான செயல்கள்' : 'Quick actions'}</h2>
         <div className="home-grid">
           {NAV.map((item) => (
-            <Link key={item.href} href={item.href} style={{ textDecoration: 'none' }}>
-              <div className="home-card">
+            <Link key={item.href} href={item.href} className={`home-link${['/bill', '/inventory', '/history'].includes(item.href) ? ' home-link-primary' : ''}`}>
+              <div className="home-card" data-primary={['/bill', '/inventory', '/history'].includes(item.href) ? 'true' : undefined}>
                 <span className="hc-icon">{item.icon}</span>
                 <span className="hc-name">{item.name}</span>
                 <span className="hc-sub">{item.sub}</span>

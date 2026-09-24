@@ -215,11 +215,11 @@ export default function RestockPage() {
                 </div>
                 )}
               </div>
-              <input type="number" min="0" step="any" value={form.qty} onChange={(event) => setForm({ ...form, qty: event.target.value })} placeholder="Qty" />
-              <select value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })}>{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select>
-              <input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} aria-label="Date" />
-              <input type="number" min="0" step="any" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Price ₹" />
-              <input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Note (optional)" />
+              <label className="form-field"><span>Quantity</span><input type="number" min="0" step="any" value={form.qty} onChange={(event) => setForm({ ...form, qty: event.target.value })} placeholder="1" /></label>
+              <label className="form-field"><span>Unit</span><select value={form.unit} onChange={(event) => setForm({ ...form, unit: event.target.value })}>{UNITS.map((unit) => <option key={unit}>{unit}</option>)}</select></label>
+              <label className="form-field"><span>Needed by</span><input type="date" value={form.date} onChange={(event) => setForm({ ...form, date: event.target.value })} aria-label="Date" /></label>
+              <label className="form-field"><span>Expected price</span><input type="number" min="0" step="any" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} placeholder="Optional" /></label>
+              <label className="form-field"><span>Note <em>(optional)</em></span><input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Add a note" /></label>
               <button className="restock-primary-btn" type="submit">Add</button>
             </form>
 

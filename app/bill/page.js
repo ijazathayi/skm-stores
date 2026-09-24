@@ -8,7 +8,7 @@ import { getProductCategory, matchesSearch, money, normalizeSearchText } from '@
 import { getProductName, t } from '@/lib/translations';
 
 export default function BillPage() {
-  const { inventory, categories, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill } = useStore();
+  const { inventory, categories, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill, cartTotal } = useStore();
   const isTa = lang === 'ta';
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
@@ -200,8 +200,9 @@ export default function BillPage() {
       </main>
 
       {/* FAB */}
-      <button className="cart-fab" onClick={() => setDrawerOpen(true)} aria-label="Open cart">
-        🛒
+      <button className="cart-fab" onClick={() => setDrawerOpen(true)} aria-label={isTa ? 'தற்போதைய ரசீதைத் திறக்கவும்' : 'Open current bill'}>
+        <span>🛒</span>
+        <span className="cart-fab-label">{cart.length ? money(cartTotal()) : (isTa ? 'கூடை' : 'Cart')}</span>
         {cart.length > 0 && <span className="cart-fab-badge">{cart.length}</span>}
       </button>
 

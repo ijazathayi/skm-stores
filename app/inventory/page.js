@@ -277,17 +277,17 @@ export default function InventoryPage() {
 
         {/* ── Add form ── */}
         <div className="inv-add-grid">
-          <input placeholder={isTa ? "பெயர் (English, e.g. Tomato)" : "English name (e.g. Tomato)"} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <input placeholder={isTa ? "தமிழ் பெயர் (எ.கா. தக்காளி)" : "தமிழ் பெயர் (optional)"} value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
-          <input type="text" inputMode="decimal" placeholder={isTa ? "விலை ₹" : "Price ₹"} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-          <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+          <label className="form-field"><span>{isTa ? 'பெயர்' : 'Product name'}</span><input placeholder={isTa ? 'எ.கா. தக்காளி' : 'e.g. Tomato'} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label className="form-field"><span>{isTa ? 'தமிழ் பெயர்' : 'Tamil name'} <em>{isTa ? '(விருப்பம்)' : '(optional)'}</em></span><input placeholder={isTa ? 'எ.கா. தக்காளி' : 'Optional' } value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} /></label>
+          <label className="form-field"><span>{isTa ? 'விலை ₹' : 'Price ₹'}</span><input type="text" inputMode="decimal" placeholder="0.00" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} /></label>
+          <label className="form-field"><span>{isTa ? 'அளவு' : 'Sold by'}</span><select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
             <option value="pcs">{isTa ? 'எண்ணிக்கை (PCS)' : 'PCS'}</option>
             <option value="kg">{isTa ? 'கிலோ (KG)' : 'KG'}</option>
             <option value="both">{isTa ? 'இரண்டும் (BOTH)' : 'BOTH'}</option>
-          </select>
-          <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ gridColumn: '1 / -1' }}>
+          </select></label>
+          <label className="form-field form-field-wide"><span>{isTa ? 'வகை' : 'Category'}</span><select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
             {CAT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          </select></label>
         </div>
         <div className="add-row">
           <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>

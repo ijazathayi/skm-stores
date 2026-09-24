@@ -58,16 +58,16 @@ export default function VegPage() {
 
         {/* add form */}
         <div className="veg-add-row">
-          <input placeholder={isTa ? 'பெயர் (எ.கா. தக்காளி)' : 'Name (e.g. Tomato)'} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" />
-          <input placeholder={isTa ? 'தமிழ் பெயர்' : 'தமிழ் பெயர் (optional)'} value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} />
-          <input type="text" inputMode="decimal" placeholder={isTa ? 'விலை ₹' : 'Price ₹'} value={form.price}
+          <label className="form-field"><span>{isTa ? 'பெயர்' : 'Vegetable name'}</span><input placeholder={isTa ? 'எ.கா. தக்காளி' : 'e.g. Tomato'} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} autoComplete="off" /></label>
+          <label className="form-field"><span>{isTa ? 'தமிழ் பெயர்' : 'Tamil name'} <em>{isTa ? '(விருப்பம்)' : '(optional)'}</em></span><input placeholder={isTa ? 'எ.கா. தக்காளி' : 'Optional'} value={form.altName} onChange={(e) => setForm({ ...form, altName: e.target.value })} /></label>
+          <label className="form-field"><span>{isTa ? 'விலை ₹' : 'Price ₹'}</span><input type="text" inputMode="decimal" placeholder="0.00" value={form.price}
             onChange={(e) => setForm({ ...form, price: e.target.value })}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }} />
-          <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); }} /></label>
+          <label className="form-field"><span>{isTa ? 'அளவு' : 'Sold by'}</span><select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
             <option value="kg">{isTa ? 'கிலோ' : 'kg'}</option>
             <option value="pcs">{isTa ? 'எண்ணிக்கை' : 'pcs'}</option>
             <option value="both">{isTa ? 'இரண்டும்' : 'both'}</option>
-          </select>
+          </select></label>
         </div>
         <div className="add-row">
           <button className="btn-primary" style={{ width: '100%' }} onClick={handleAdd}>

@@ -12,7 +12,7 @@ export default function Header({ backHref, onBack, title, showLangToggle = true 
   const isTa = lang === 'ta';
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       marginBottom: 16, flexWrap: 'wrap', gap: 10, padding: '14px 16px 0',
       maxWidth: 900, margin: '0 auto'
@@ -122,9 +122,10 @@ export default function Header({ backHref, onBack, title, showLangToggle = true 
           type="button"
           onClick={signOut}
           title={user?.email || ''}
+          aria-label={user?.email ? `Sign out ${user.email}` : 'Sign out'}
           style={{ border: '1px solid var(--border)', borderRadius: 999, background: 'var(--card)', color: 'var(--ink3)', padding: '7px 10px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
         >
-          {role === 'admin' ? 'Admin' : 'Staff'} · Sign out
+          <span className="header-role">{role === 'admin' ? 'Admin' : 'Staff'} · </span>Sign out
         </button>
       </div>
     </header>

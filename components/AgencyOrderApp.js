@@ -316,7 +316,7 @@ export default function AgencyOrderApp() {
       if (fromIndex < 0 || targetIndex < 0 || fromIndex === targetIndex) return current;
       const next = [...current];
       next.splice(fromIndex, 1);
-      next.splice(targetIndex - (fromIndex < targetIndex ? 1 : 0), 0, lineId);
+      next.splice(targetIndex, 0, lineId);
       return next;
     });
   }

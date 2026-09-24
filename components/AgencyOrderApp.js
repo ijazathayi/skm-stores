@@ -101,6 +101,9 @@ export default function AgencyOrderApp() {
   const [pRetail, setPRetail] = useState('');
   const [editingProductId, setEditingProductId] = useState(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [productOrder, setProductOrder] = useState([]);
+  const productOrderRef = useRef([]);
+  const [draggedProductId, setDraggedProductId] = useState(null);
 
   // Order modal
   const [orderModal, setOrderModal] = useState(false);
@@ -214,6 +217,10 @@ export default function AgencyOrderApp() {
   /* ── product CRUD ── */
   function openProducts(agencyId) {
     setProductAgencyId(agencyId);
+    const order = (agency(agencyId)?.products || []).map((product) => product.id);
+    productOrderRef.current = order;
+    setProductOrder(order);
+    setDraggedProductId(null);
     setPName('');
     setPUnit('');
     setPWhole('');
@@ -260,6 +267,11 @@ export default function AgencyOrderApp() {
         ? (a.products || []).map((p) => p.id === editingProductId ? product : p)
         : [...(a.products || []), product];
       await updateDoc(doc(db, 'agencies', productAgencyId), { products: updatedProducts });
+      if (!editingProductId) {
+        const nextOrder = [...productOrderRef.current, product.id];
+        productOrderRef.current = nextOrder;
+        setProductOrder(nextOrder);
+      }
       clearProductForm();
       showToast(editingProductId
         ? (isTa ? '✓ பொருள் புதுப்பிக்கப்பட்டது' : '✓ Product updated')
@@ -278,11 +290,67 @@ export default function AgencyOrderApp() {
     try {
       const updatedProducts = (a.products || []).filter((p) => p.id !== prodId);
       await updateDoc(doc(db, 'agencies', agencyId), { products: updatedProducts });
+      const nextOrder = productOrderRef.current.filter((id) => id !== prodId);
+      productOrderRef.current = nextOrder;
+      setProductOrder(nextOrder);
       if (editingProductId === prodId) clearProductForm();
       showToast(isTa ? 'பொருள் நீக்கப்பட்டது' : 'Product removed');
     } catch (err) {
       alert('Error removing product: ' + err.message);
     }
+  }
+
+  function reorderProduct(productId, targetProductId) {
+    setProductOrder((current) => {
+      const source = current.indexOf(productId);
+      const target = current.indexOf(targetProductId);
+      if (source < 0 || target < 0 || source === target) return current;
+      const next = [...current];
+      next.splice(source, 1);
+      next.splice(target, 0, productId);
+      productOrderRef.current = next;
+      return next;
+    });
+  }
+
+  async function saveProductOrder() {
+    const a = agency(productAgencyId);
+    const order = productOrderRef.current;
+    if (!a || !order.length) return;
+    const productsById = new Map((a.products || []).map((product) => [product.id, product]));
+    const reorderedProducts = [
+      ...order.map((id) => productsById.get(id)).filter(Boolean),
+      ...(a.products || []).filter((product) => !order.includes(product.id))
+    ];
+    setAgencies((current) => current.map((item) => item.id === productAgencyId ? { ...item, products: reorderedProducts } : item));
+    try {
+      await updateDoc(doc(db, 'agencies', productAgencyId), { products: reorderedProducts });
+    } catch (err) {
+      alert('Error saving product order: ' + err.message);
+    }
+  }
+
+  function startProductPointerDrag(event, productId) {
+    if (event.pointerType === 'mouse') return;
+    event.preventDefault();
+    setDraggedProductId(productId);
+
+    const handleMove = (moveEvent) => {
+      const target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('[data-agency-product]');
+      const targetProductId = target?.getAttribute('data-agency-product');
+      if (targetProductId && targetProductId !== productId) reorderProduct(productId, targetProductId);
+    };
+    const handleEnd = async () => {
+      setDraggedProductId(null);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('pointercancel', handleEnd);
+      if (event.type !== 'pointercancel') await saveProductOrder();
+    };
+
+    window.addEventListener('pointermove', handleMove, { passive: false });
+    window.addEventListener('pointerup', handleEnd, { once: true });
+    window.addEventListener('pointercancel', handleEnd, { once: true });
   }
 
   /* ── order cart ── */
@@ -492,6 +560,11 @@ export default function AgencyOrderApp() {
   const orderTotal = currentLines.reduce((s, l) => s + l.amount, 0);
   const orderAgency = orderAgencyId ? agency(orderAgencyId) : null;
   const productAgency = productAgencyId ? agency(productAgencyId) : null;
+  const orderedProducts = productAgency ? [...(productAgency.products || [])].sort((a, b) => {
+    const aIndex = productOrder.indexOf(a.id);
+    const bIndex = productOrder.indexOf(b.id);
+    return (aIndex < 0 ? Number.MAX_SAFE_INTEGER : aIndex) - (bIndex < 0 ? Number.MAX_SAFE_INTEGER : bIndex);
+  }) : [];
 
   const selectedLinesPanel = (
     <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
@@ -734,16 +807,52 @@ export default function AgencyOrderApp() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 540 }}>
               <thead>
                 <tr>
-                  {['Product', 'Unit', 'Wholesale', 'Retail', 'Margin', ''].map((h, i) => (
+                  {['', 'Product', 'Unit', 'Wholesale', 'Retail', 'Margin', ''].map((h, i) => (
                     <th key={i} style={{ ...thStyle, textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {productAgency && (!productAgency.products || productAgency.products.length === 0) ? (
-                  <tr><td colSpan={6} style={{ color: '#8a6a4f', padding: '22px 12px', textAlign: 'center' }}>No products listed for this agency yet.</td></tr>
-                ) : productAgency && productAgency.products.map((p) => (
-                  <tr key={p.id}>
+                  <tr><td colSpan={7} style={{ color: '#8a6a4f', padding: '22px 12px', textAlign: 'center' }}>No products listed for this agency yet.</td></tr>
+                ) : productAgency && orderedProducts.map((p) => (
+                  <tr
+                    key={p.id}
+                    data-agency-product={p.id}
+                    draggable
+                    onDragStart={(event) => {
+                      if (!event.target.closest('[data-product-drag-handle]')) {
+                        event.preventDefault();
+                        return;
+                      }
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', p.id);
+                      setDraggedProductId(p.id);
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      const sourceProductId = draggedProductId || event.dataTransfer.getData('text/plain');
+                      if (sourceProductId) reorderProduct(sourceProductId, p.id);
+                    }}
+                    onDragEnd={async () => {
+                      setDraggedProductId(null);
+                      await saveProductOrder();
+                    }}
+                    style={{ opacity: draggedProductId === p.id ? 0.55 : 1 }}
+                  >
+                    <td style={{ ...tdStyle, width: 34, paddingRight: 0 }}>
+                      <span
+                        data-product-drag-handle
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Drag ${p.name} to reorder`}
+                        title="Drag to reorder"
+                        onPointerDown={(event) => startProductPointerDrag(event, p.id)}
+                        style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, width: 18, padding: 8, margin: -8, cursor: 'grab', touchAction: 'none' }}
+                      >
+                        {Array.from({ length: 6 }, (_, dotIndex) => <span key={dotIndex} style={{ width: 3, height: 3, borderRadius: '50%', background: '#8a6a4f' }} />)}
+                      </span>
+                    </td>
                     <td style={tdStyle}>{esc(p.name)}</td>
                     <td style={tdStyle}>{esc(p.unit || '—')}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>{money(p.wholesale)}</td>

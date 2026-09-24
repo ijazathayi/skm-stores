@@ -332,6 +332,28 @@ export default function AgencyOrderApp() {
     });
   }
 
+  function startPointerDrag(event, lineId) {
+    if (event.pointerType === 'mouse') return;
+    event.preventDefault();
+    setDraggedLineId(lineId);
+
+    const handleMove = (moveEvent) => {
+      const target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('[data-agency-line]');
+      const targetLineId = target?.getAttribute('data-agency-line');
+      if (targetLineId && targetLineId !== lineId) reorderLine(lineId, targetLineId);
+    };
+    const handleEnd = () => {
+      setDraggedLineId(null);
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('pointercancel', handleEnd);
+    };
+
+    window.addEventListener('pointermove', handleMove, { passive: false });
+    window.addEventListener('pointerup', handleEnd, { once: true });
+    window.addEventListener('pointercancel', handleEnd, { once: true });
+  }
+
   function cartLines(agencyId, currentCart, mode, orderedIds = []) {
     const a = agency(agencyId);
     if (!a || !Array.isArray(a.products)) return [];
@@ -772,6 +794,7 @@ export default function AgencyOrderApp() {
               {currentLines.length ? currentLines.map((line, index) => (
                 <div
                   key={line.id}
+                  data-agency-line={line.id}
                   draggable
                   onDragStart={(event) => {
                     if (!event.target.closest('[data-drag-handle]')) {
@@ -791,7 +814,15 @@ export default function AgencyOrderApp() {
                   style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: `1px solid ${draggedLineId === line.id ? '#c2410c' : 'rgba(122,84,48,.14)'}`, borderRadius: 9, cursor: 'grab', opacity: draggedLineId === line.id ? 0.55 : 1, transition: 'border-color .15s, opacity .15s' }}
                   aria-label={`Drag ${line.name} to reorder`}
                 >
-                  <span data-drag-handle aria-label={`Drag ${line.name} to reorder`} title="Drag to reorder" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, padding: 4, margin: -4, cursor: 'grab' }}>
+                  <span
+                    data-drag-handle
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Drag ${line.name} to reorder`}
+                    title="Drag to reorder"
+                    onPointerDown={(event) => startPointerDrag(event, line.id)}
+                    style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, padding: 8, margin: -8, cursor: 'grab', touchAction: 'none' }}
+                  >
                     {Array.from({ length: 6 }, (_, dotIndex) => <span key={dotIndex} style={{ width: 3, height: 3, borderRadius: '50%', background: '#8a6a4f' }} />)}
                   </span>
                   <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>

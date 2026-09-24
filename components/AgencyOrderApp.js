@@ -493,6 +493,57 @@ export default function AgencyOrderApp() {
   const orderAgency = orderAgencyId ? agency(orderAgencyId) : null;
   const productAgency = productAgencyId ? agency(productAgencyId) : null;
 
+  const selectedLinesPanel = (
+    <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
+      <div style={{ padding: '4px 4px 8px', color: '#8a6a4f', fontSize: 12 }}>
+        Drag a line using the handle, or use the arrows to set the print order.
+      </div>
+      {currentLines.length ? currentLines.map((line, index) => (
+        <div
+          key={line.id}
+          data-agency-line={line.id}
+          draggable
+          onDragStart={(event) => {
+            if (!event.target.closest('[data-drag-handle]')) {
+              event.preventDefault();
+              return;
+            }
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', line.id);
+            setDraggedLineId(line.id);
+          }}
+          onDragOver={(event) => {
+            event.preventDefault();
+            const sourceLineId = draggedLineId || event.dataTransfer.getData('text/plain');
+            if (sourceLineId) reorderLine(sourceLineId, line.id);
+          }}
+          onDragEnd={() => setDraggedLineId(null)}
+          style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: `1px solid ${draggedLineId === line.id ? '#c2410c' : 'rgba(122,84,48,.14)'}`, borderRadius: 9, cursor: 'grab', opacity: draggedLineId === line.id ? 0.55 : 1, transition: 'border-color .15s, opacity .15s' }}
+          aria-label={`Drag ${line.name} to reorder`}
+        >
+          <span
+            data-drag-handle
+            role="button"
+            tabIndex={0}
+            aria-label={`Drag ${line.name} to reorder`}
+            title="Drag to reorder"
+            onPointerDown={(event) => startPointerDrag(event, line.id)}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, padding: 8, margin: -8, cursor: 'grab', touchAction: 'none' }}
+          >
+            {Array.from({ length: 6 }, (_, dotIndex) => <span key={dotIndex} style={{ width: 3, height: 3, borderRadius: '50%', background: '#8a6a4f' }} />)}
+          </span>
+          <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
+          <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
+          <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />
+          <div className="agency-reorder-actions" aria-label={`Move ${line.name}`}>
+            <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} title="Move up">↑</button>
+            <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} title="Move down">↓</button>
+          </div>
+        </div>
+      )) : <div style={{ padding: 22, color: '#8a6a4f', textAlign: 'center' }}>Select products first.</div>}
+    </div>
+  );
+
   return (
     <div style={{ minHeight: '100vh', color: '#3a2415', fontFamily: 'Figtree, system-ui, sans-serif', background: 'linear-gradient(135deg,#fbe9cf,#f6d3b4 45%,#f2b9ac)', overflowX: 'hidden' }}>
 
@@ -748,94 +799,47 @@ export default function AgencyOrderApp() {
             {orderView === 'selected' && <button type="button" onClick={() => setOrderView('all')} style={topbarBtn}>Add more products</button>}
           </div>
 
-          {orderView === 'all' ? <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
-              <thead>
-                <tr>
-                  {['Product', 'Unit', 'Rate', 'Qty', 'Amount'].map((h, i) => (
-                    <th key={i} style={{ ...thStyle, textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {orderAgency && (!orderAgency.products || orderAgency.products.length === 0) ? (
-                  <tr><td colSpan={5} style={{ padding: '22px 12px', color: '#8a6a4f', textAlign: 'center' }}>Add products to this agency first.</td></tr>
-                ) : orderAgency && orderAgency.products.map((p) => {
-                  const q = cart[p.id] || 0;
-                  const rate = priceOf(p);
-                  return (
-                    <tr key={p.id}>
-                      <td style={tdStyle}>{esc(p.name)}</td>
-                      <td style={tdStyle}>{esc(p.unit || '—')}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>{money(rate)}</td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
-                        <input
-                          type="number" min="0" step="0.5"
-                          value={q || ''}
-                          placeholder="0"
-                          onChange={(e) => {
-                            const v = parseFloat(e.target.value);
-                            updateCartQuantity(p.id, v);
-                          }}
-                          style={{ width: 80, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }}
-                        />
-                      </td>
-                      <td style={{ ...tdStyle, textAlign: 'right', fontWeight: q > 0 ? 600 : 400 }}>{q > 0 ? money(q * rate) : '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div> : (
-              <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
-              <div style={{ padding: '4px 4px 8px', color: '#8a6a4f', fontSize: 12 }}>
-                Drag a line using the handle, or use the arrows to set the print order.
-              </div>
-              {currentLines.length ? currentLines.map((line, index) => (
-                <div
-                  key={line.id}
-                  data-agency-line={line.id}
-                  draggable
-                  onDragStart={(event) => {
-                    if (!event.target.closest('[data-drag-handle]')) {
-                      event.preventDefault();
-                      return;
-                    }
-                    event.dataTransfer.effectAllowed = 'move';
-                    event.dataTransfer.setData('text/plain', line.id);
-                    setDraggedLineId(line.id);
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    const sourceLineId = draggedLineId || event.dataTransfer.getData('text/plain');
-                    if (sourceLineId) reorderLine(sourceLineId, line.id);
-                  }}
-                  onDragEnd={() => setDraggedLineId(null)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px', background: '#fff', border: `1px solid ${draggedLineId === line.id ? '#c2410c' : 'rgba(122,84,48,.14)'}`, borderRadius: 9, cursor: 'grab', opacity: draggedLineId === line.id ? 0.55 : 1, transition: 'border-color .15s, opacity .15s' }}
-                  aria-label={`Drag ${line.name} to reorder`}
-                >
-                  <span
-                    data-drag-handle
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Drag ${line.name} to reorder`}
-                    title="Drag to reorder"
-                    onPointerDown={(event) => startPointerDrag(event, line.id)}
-                    style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 3px)', gridTemplateRows: 'repeat(3, 3px)', gap: 2, padding: 8, margin: -8, cursor: 'grab', touchAction: 'none' }}
-                  >
-                    {Array.from({ length: 6 }, (_, dotIndex) => <span key={dotIndex} style={{ width: 3, height: 3, borderRadius: '50%', background: '#8a6a4f' }} />)}
-                  </span>
-                  <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
-                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
-                  <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />
-                  <div className="agency-reorder-actions" aria-label={`Move ${line.name}`}>
-                    <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} title="Move up">↑</button>
-                    <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} title="Move down">↓</button>
-                  </div>
-                </div>
-              )) : <div style={{ padding: 22, color: '#8a6a4f', textAlign: 'center' }}>Select products first.</div>}
+          {orderView === 'all' ? (
+            <div style={{ overflowX: 'auto', border: '1px solid rgba(122,84,48,.18)', borderRadius: 14 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14, minWidth: 520 }}>
+                <thead>
+                  <tr>
+                    {['Product', 'Unit', 'Rate', 'Qty', 'Amount'].map((h, i) => (
+                      <th key={i} style={{ ...thStyle, textAlign: i >= 2 ? 'right' : 'left' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {orderAgency && (!orderAgency.products || orderAgency.products.length === 0) ? (
+                    <tr><td colSpan={5} style={{ padding: '22px 12px', color: '#8a6a4f', textAlign: 'center' }}>Add products to this agency first.</td></tr>
+                  ) : orderAgency && orderAgency.products.map((p) => {
+                    const q = cart[p.id] || 0;
+                    const rate = priceOf(p);
+                    return (
+                      <tr key={p.id}>
+                        <td style={tdStyle}>{esc(p.name)}</td>
+                        <td style={tdStyle}>{esc(p.unit || '—')}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>{money(rate)}</td>
+                        <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <input
+                            type="number" min="0" step="0.5"
+                            value={q || ''}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const v = parseFloat(e.target.value);
+                              updateCartQuantity(p.id, v);
+                            }}
+                            style={{ width: 80, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }}
+                          />
+                        </td>
+                        <td style={{ ...tdStyle, textAlign: 'right', fontWeight: q > 0 ? 600 : 400 }}>{q > 0 ? money(q * rate) : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
+          ) : selectedLinesPanel}
 
           {orderView === 'all' && currentLines.length > 0 && (
             <div style={{ marginTop: 16, padding: 14, border: '1px solid rgba(194,65,12,.22)', borderRadius: 14, background: 'rgba(255,248,237,.78)' }}>
@@ -844,7 +848,12 @@ export default function AgencyOrderApp() {
                 <button type="button" onClick={() => setOrderView('selected')} style={brandBtn}>Show bill</button>
                 <span style={{ color: '#8a6a4f', fontSize: 12 }}>Review the bill and arrange lines next</span>
               </div>
+              <div style={{ marginTop: 10 }}>{selectedLinesPanel}</div>
             </div>
+          )}
+
+          {orderView === 'selected' && (
+            <div style={{ marginTop: 16 }}>{selectedLinesPanel}</div>
           )}
 
           <div style={{ maxWidth: 340, marginLeft: 'auto', marginTop: 16 }}>

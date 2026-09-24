@@ -321,6 +321,17 @@ export default function AgencyOrderApp() {
     });
   }
 
+  function moveLine(lineId, direction) {
+    setLineOrder((current) => {
+      const index = current.indexOf(lineId);
+      const target = index + direction;
+      if (index < 0 || target < 0 || target >= current.length) return current;
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   function cartLines(agencyId, currentCart, mode, orderedIds = []) {
     const a = agency(agencyId);
     if (!a || !Array.isArray(a.products)) return [];
@@ -754,7 +765,10 @@ export default function AgencyOrderApp() {
               </tbody>
             </table>
           </div> : (
-            <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
+              <div style={{ display: 'grid', gap: 8, border: '1px solid rgba(122,84,48,.18)', borderRadius: 14, padding: 10 }}>
+              <div style={{ padding: '4px 4px 8px', color: '#8a6a4f', fontSize: 12 }}>
+                Drag a line using the handle, or use the arrows to set the print order.
+              </div>
               {currentLines.length ? currentLines.map((line, index) => (
                 <div
                   key={line.id}
@@ -783,6 +797,10 @@ export default function AgencyOrderApp() {
                   <span style={{ width: 22, color: '#8a6a4f', fontSize: 12, fontWeight: 700 }}>{index + 1}</span>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{esc(line.name)}</span>
                   <input type="number" min="0" step="0.5" value={line.qty} onChange={(e) => updateCartQuantity(line.id, parseFloat(e.target.value))} style={{ width: 70, textAlign: 'right', border: '1px solid rgba(122,84,48,.25)', borderRadius: 8, padding: '7px 8px', fontFamily: 'inherit', fontSize: 14, background: '#fff' }} />
+                  <div className="agency-reorder-actions" aria-label={`Move ${line.name}`}>
+                    <button type="button" onClick={() => moveLine(line.id, -1)} disabled={index === 0} aria-label={`Move ${line.name} up`} title="Move up">↑</button>
+                    <button type="button" onClick={() => moveLine(line.id, 1)} disabled={index === currentLines.length - 1} aria-label={`Move ${line.name} down`} title="Move down">↓</button>
+                  </div>
                 </div>
               )) : <div style={{ padding: 22, color: '#8a6a4f', textAlign: 'center' }}>Select products first.</div>}
             </div>

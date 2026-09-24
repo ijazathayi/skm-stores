@@ -231,7 +231,7 @@ export default function AdminPage() {
             </div>
             {staffMsg && <span style={{ fontSize: 13, color: staffMsg.includes('saved') || staffMsg.includes('deleted') ? 'var(--primary-dark)' : 'var(--danger)' }}>{staffMsg}</span>}
           </div>
-          <form onSubmit={saveStaff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto', gap: 8, marginBottom: 14 }}>
+          <form className="admin-inline-form admin-staff-form" onSubmit={saveStaff} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 130px auto', gap: 8, marginBottom: 14 }}>
             <input value={staffForm.name} onChange={(event) => setStaffForm({ ...staffForm, name: event.target.value })} placeholder="Name / login" required style={priceInputStyle} />
             <input type="password" value={staffForm.password} onChange={(event) => setStaffForm({ ...staffForm, password: event.target.value })} placeholder={editingStaff ? 'New password (optional)' : 'Password'} required={!editingStaff} style={priceInputStyle} />
             <select value={staffForm.role} onChange={(event) => setStaffForm({ ...staffForm, role: event.target.value })} style={priceInputStyle}><option value="staff">Staff</option><option value="admin">Admin</option></select>
@@ -252,7 +252,7 @@ export default function AdminPage() {
             </div>
             {categoryMsg && <span style={{ fontSize: 13, color: categoryMsg.includes('saved') || categoryMsg.includes('deleted') ? 'var(--primary-dark)' : 'var(--danger)' }}>{categoryMsg}</span>}
           </div>
-          <form onSubmit={saveCategory} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px auto', gap: 8, marginBottom: 14 }}>
+          <form className="admin-inline-form admin-category-form" onSubmit={saveCategory} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 90px auto', gap: 8, marginBottom: 14 }}>
             <input value={categoryForm.label} onChange={(event) => setCategoryForm({ ...categoryForm, label: event.target.value })} placeholder="Category name" required style={priceInputStyle} />
             <input value={categoryForm.labelTa} onChange={(event) => setCategoryForm({ ...categoryForm, labelTa: event.target.value })} placeholder="Tamil name (optional)" style={priceInputStyle} />
             <input value={categoryForm.icon} onChange={(event) => setCategoryForm({ ...categoryForm, icon: event.target.value })} placeholder="Icon" style={priceInputStyle} />

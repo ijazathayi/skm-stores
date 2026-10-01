@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { money } from '@/lib/helpers';
 import { getProductName } from '@/lib/translations';
-import { useAuth } from '@/components/AuthProvider';
 import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoothPrinter';
 
 /* Group bills array into { "Sunday, 6 Sep 2026": [bill, …], … } */
@@ -23,7 +22,6 @@ function groupByDate(bills, isTa) {
 
 export default function HistoryPage() {
   const { bills, todaySales, storeProfile, lang, editBill, deleteSale } = useStore();
-  const { role } = useAuth();
   const router = useRouter();
   const isTa = lang === 'ta';
   const [selectedBill, setSelectedBill] = useState(null);
@@ -107,7 +105,7 @@ export default function HistoryPage() {
                           </span>
                           <button className="icon-btn" title={isTa ? 'Bluetooth மூலம் அச்சிடு' : 'Print via Bluetooth'} onClick={() => printBillBluetooth(b)}>📡</button>
                           <button className="icon-btn" title={isTa ? 'ரசீதைத் திருத்து' : 'Edit bill'} onClick={() => startEdit(b)}>✏️</button>
-                          {role === 'admin' && <button className="icon-btn" title="Delete sale" onClick={() => { if (window.confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>}
+                          <button className="icon-btn" title="Delete sale" onClick={() => { if (window.confirm('Delete this sale permanently?')) deleteSale(b.id); }}>🗑</button>
                         </span>
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--ink3)', marginTop: 2 }}>

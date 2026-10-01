@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
-import PasskeySetup from '@/components/PasskeySetup';
 import { useStore } from '@/lib/store';
 
 const LS = (k, def) => typeof window !== 'undefined' ? (localStorage.getItem(k) || def) : def;
@@ -20,11 +19,6 @@ export default function SettingsPage() {
   const [printWidth, setPrintWidth] = useState(58);
   const [printLang,  setPrintLang]  = useState('en');
   const [messageLang, setMessageLang] = useState('en');
-
-  // ── password fields ──
-  const [curPwd, setCurPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [conPwd, setConPwd] = useState('');
 
   const [saved, setSaved] = useState('');
 
@@ -112,17 +106,6 @@ export default function SettingsPage() {
     }
   };
 
-  /* ── Admin password (localStorage only) ── */
-  const changePwd = () => {
-    const stored = LS('skm_adminPassword', 'skm@ijaz');
-    if (curPwd !== stored)  { alert(isTa ? 'தற்போதைய கடவுச்சொல் தவறானது' : 'Current password incorrect'); return; }
-    if (!newPwd)            { alert(isTa ? 'புதிய கடவுச்சொல் காலியாக இருக்கக்கூடாது' : 'New password cannot be empty'); return; }
-    if (newPwd !== conPwd)  { alert(isTa ? 'கடவுச்சொற்கள் பொருந்தவில்லை' : 'Passwords do not match'); return; }
-    localStorage.setItem('skm_adminPassword', newPwd);
-    setCurPwd(''); setNewPwd(''); setConPwd('');
-    flash(isTa ? '✓ கடவுச்சொல் மாற்றப்பட்டது!' : '✓ Password updated!');
-  };
-
   return (
     <>
       <Header backHref="/" title={isTa ? '⚙ அமைப்புகள்' : '⚙ Settings'} />
@@ -136,8 +119,6 @@ export default function SettingsPage() {
             {saved}
           </div>
         )}
-
-        <PasskeySetup />
 
         {/* ── Store Profile ── */}
         <div className="settings-card">
@@ -221,26 +202,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* ── Admin Password ── */}
-        <div className="settings-card">
-          <h4>🔒 {isTa ? 'நிர்வாக கடவுச்சொல்' : 'Admin Password'}</h4>
-          <p style={{ fontSize: 12, color: 'var(--ink3)', margin: '4px 0 14px' }}>
-            {isTa ? 'நிர்வாக பக்கத்தை அணுக கடவுச்சொல் தேவை.' : 'Required to access the Admin panel.'}
-          </p>
-          {[
-            [isTa ? 'தற்போதைய கடவுச்சொல்' : 'Current Password',     curPwd, setCurPwd],
-            [isTa ? 'புதிய கடவுச்சொல்' : 'New Password',         newPwd, setNewPwd],
-            [isTa ? 'புதிய கடவுச்சொல்லை உறுதிசெய்' : 'Confirm New Password', conPwd, setConPwd],
-          ].map(([l, v, s]) => (
-            <div key={l} className="setting-field">
-              <label>{l}</label>
-              <input type="password" value={v} onChange={(e) => s(e.target.value)} autoComplete="off" />
-            </div>
-          ))}
-          <button className="btn-primary" style={{ width: '100%', marginTop: 4 }} onClick={changePwd}>
-            {isTa ? 'கடவுச்சொல்லை மாற்றுக' : 'Update Password'}
-          </button>
-        </div>
       </main>
     </>
   );

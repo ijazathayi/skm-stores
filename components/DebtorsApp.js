@@ -7,7 +7,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
-import { useAuth } from '@/components/AuthProvider';
 
 /* ── helpers ── */
 const today = () => new Date().toISOString().slice(0, 10);
@@ -50,10 +49,8 @@ function getCurrentDebtCycle(entries) {
 
 export default function DebtorsApp({ customerId = null }) {
   const { lang, storeProfile } = useStore();
-  const { role } = useAuth();
   const isTa = lang === 'ta';
   const messageIsTa = (storeProfile?.messageLang || (typeof window !== 'undefined' ? localStorage.getItem('skm_messageLang') : 'en')) === 'ta';
-  const isAdmin = role === 'admin';
   const [customers, setCustomers] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -222,7 +219,7 @@ export default function DebtorsApp({ customerId = null }) {
   }
 
   async function deleteDebtEntry(entry) {
-    if (!isAdmin || !window.confirm('Delete this ledger entry permanently?')) return;
+    if (!window.confirm('Delete this ledger entry permanently?')) return;
     try {
       await deleteDoc(doc(db, 'debtors_entries', entry.id));
     } catch (err) {
@@ -231,7 +228,7 @@ export default function DebtorsApp({ customerId = null }) {
   }
 
   async function deleteCustomer() {
-    if (!isAdmin || !currentCustomer) return;
+    if (!currentCustomer) return;
     if (!window.confirm(`Delete ${currentCustomer.name} and all of this customer's ledger entries?`)) return;
     try {
       const customerEntries = entries.filter((entry) => entry.customerId === currentCustomer.id);
@@ -554,7 +551,7 @@ export default function DebtorsApp({ customerId = null }) {
                       <td style={ledgerTd}>{escapeHtml(customerNames.get(entry.customerId) || 'Unknown customer')}</td>
                       <td style={{ ...ledgerTd, maxWidth: 240 }}>{details}</td>
                       <td style={{ ...ledgerTd, textAlign: 'right' }}>{entry.kind === 'debt' ? money(entry.amount) : '—'}</td>
-                      <td style={{ ...ledgerTd, textAlign: 'right' }}>{entry.kind === 'payment' ? money(entry.amount) : '—'}{isAdmin && <button type="button" onClick={() => deleteDebtEntry(entry)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button>}</td>
+                      <td style={{ ...ledgerTd, textAlign: 'right' }}>{entry.kind === 'payment' ? money(entry.amount) : '—'}<button type="button" onClick={() => deleteDebtEntry(entry)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button></td>
                     </tr>
                   );
                 })}
@@ -675,9 +672,9 @@ export default function DebtorsApp({ customerId = null }) {
                     <button type="button" onClick={startEditingCustomer} style={secondaryBtn}>
                       {isTa ? 'வாடிக்கையாளர் விவரங்களைத் திருத்து' : 'Edit customer details'}
                     </button>
-                    {isAdmin && <button type="button" onClick={deleteCustomer} style={{ ...secondaryBtn, color: '#A8321C', borderColor: '#A8321C' }}>
+                    <button type="button" onClick={deleteCustomer} style={{ ...secondaryBtn, color: '#A8321C', borderColor: '#A8321C' }}>
                       🗑 Delete customer
-                    </button>}
+                    </button>
                   </div>
                 )}
 
@@ -736,7 +733,7 @@ export default function DebtorsApp({ customerId = null }) {
                             <td style={{ ...ledgerTd, textAlign: 'right' }}>{e.kind === 'payment' ? money(e.amount) : '—'}</td>
                             <td style={{ ...ledgerTd, textAlign: 'right', fontWeight: 600 }}>
                               <span>{money(e.running)}</span>
-                              {isAdmin && <button type="button" onClick={() => deleteDebtEntry(e)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button>}
+                              <button type="button" onClick={() => deleteDebtEntry(e)} style={{ marginLeft: 8, border: 0, background: 'transparent', color: '#A8321C', cursor: 'pointer' }} title="Delete entry">🗑</button>
                             </td>
                           </tr>
                         );

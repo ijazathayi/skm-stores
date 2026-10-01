@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
-import { useAuth } from '@/components/AuthProvider';
 import { useStore } from '@/lib/store';
 import { matchesSearch } from '@/lib/helpers';
 import { db } from '@/lib/firebase';
@@ -48,7 +47,6 @@ function normalizeState(value) {
 }
 
 export default function RestockPage() {
-  const { user } = useAuth();
   const { inventory } = useStore();
   const [state, setState] = useState(EMPTY_STATE);
   const [form, setForm] = useState({ name: '', qty: '1', unit: 'pcs', price: '', date: new Date().toISOString().slice(0, 10), note: '' });
@@ -75,7 +73,7 @@ export default function RestockPage() {
       await setDoc(RESTOCK_REF, {
         ...nextState,
         updatedAt: new Date().toISOString(),
-        updatedBy: user.uid,
+        updatedBy: 'shared-device',
       });
       if (successMessage) setToast(successMessage);
     } catch (error) {

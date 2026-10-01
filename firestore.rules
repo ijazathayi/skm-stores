@@ -18,10 +18,9 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Staff can use the day-to-day store tools. Only admins can delete data.
+    // Only administrators can access store data.
     match /{document=**} {
-      allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow read, create, update: if isAdmin();
       allow delete: if isAdmin();
     }
   }

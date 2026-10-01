@@ -1,5 +1,5 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server';
-import { getBearerToken, getPasskeyConfig, getPasskeyServices } from '@/lib/passkey-server';
+import { getBearerToken, getPasskeyConfig, getPasskeyServices, requireAdmin } from '@/lib/passkey-server';
 
 export const runtime = 'nodejs';
 
@@ -7,6 +7,7 @@ export async function POST(request) {
   try {
     const { adminAuth, adminDb } = getPasskeyServices();
     const decoded = await adminAuth.verifyIdToken(getBearerToken(request));
+    await requireAdmin(adminDb, decoded.uid);
     const { expectedOrigin, rpID } = getPasskeyConfig(request);
     const credentials = await adminDb.collection('passkeys').doc(decoded.uid).collection('credentials').get();
     const options = await generateRegistrationOptions({

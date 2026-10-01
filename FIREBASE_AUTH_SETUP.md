@@ -1,28 +1,28 @@
-# Set up staff and admin accounts
+# Set up the administrator account
 
 1. In the Firebase console for **skm-billing-33a82**, open **Authentication** → **Sign-in method** and enable **Email/Password**.
-2. In **Authentication** → **Users**, create an email/password account for every staff member and administrator.
+2. In **Authentication** → **Users**, create the administrator's email/password account.
 
-   - Create each account using `NAME@skm.local` as its email. For example, use `siddica@skm.local`, `kasim@skm.local`, and `ijaz@skm.local`.
-   - Everyone signs in using only their name and password. The app turns the name into the internal Firebase email automatically.
+   - Use `NAME@skm.local` as the email, such as `admin@skm.local`.
+   - Sign in using only the account name and password. The app turns the name into the internal Firebase email automatically.
 3. Copy each user's UID. In Firestore, create this document for each person:
 
    - Collection: `user`
    - Document ID: that user's Firebase UID
    - Field: `role` (string)
-   - Value: `admin` for an administrator, or `staff` for a staff member
+   - Value: `admin`
 
 4. In Firestore **Rules**, publish the contents of `firestore.rules` from this project.
 
-Staff can use the store pages but cannot open the Admin page. Administrators are sent directly to the Admin page and can delete records. A person whose `user/{uid}` document does not have a valid role cannot sign in to the app.
+Only accounts whose `user/{uid}` document has the `admin` role can use the app. The existing sign-in route is only needed to authorize a new device; an authorized browser remains signed in and opens directly to Home.
 
-Login remains active on the same device and browser until the person uses **Sign out**. It will not remain active in a different browser or device.
+Firebase keeps the administrator signed in on the same browser. A new browser or device must be authorized once through the sign-in route. Existing staff account records are not deleted by this app, but staff roles cannot access the application or store data.
 
 ## Fingerprint sign-in (passkeys)
 
-Fingerprint sign-in is device-based: do not collect a person's fingerprint or try to upload one to Firebase. Instead, have the staff member sign in with their password on the device they will use, open **Settings**, and select **Set up fingerprint on this device**. Windows Hello, Android, or iPhone will ask the staff member to verify their own fingerprint (or device PIN/face unlock where applicable).
+Fingerprint sign-in is device-based: do not collect a person's fingerprint or try to upload one to Firebase. Sign in as the administrator on the device you will use, open **Settings**, and select **Set up fingerprint on this device**. Windows Hello, Android, or iPhone will ask the administrator to verify their fingerprint (or device PIN/face unlock where applicable).
 
-For example, Siddica signs in once as `siddica` (the app uses `siddica@skm.local` internally), opens Settings, and sets up the fingerprint on her device. From then on she enters `siddica` on the login screen and chooses **Sign in with fingerprint**.
+After setup, enter the administrator account name on the sign-in screen and choose **Sign in with fingerprint**.
 
 The passkey server must run with these private server environment variables. Add them to the deployment service's environment settings; do not put them in `NEXT_PUBLIC_*` variables or commit them to the repository.
 

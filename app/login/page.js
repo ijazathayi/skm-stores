@@ -56,8 +56,7 @@ export default function LoginPage() {
       const result = await signInWithCustomToken(auth, token);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
       const storedRole = profile.exists() ? profile.data().role : null;
-      const role = storedRole === 'worker' ? 'staff' : storedRole;
-      if (role !== 'admin' && role !== 'staff') throw new Error('This account has no assigned role.');
+      if (storedRole !== 'admin') throw new Error('This account is not an administrator.');
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
       router.replace('/');
     } catch (err) {
@@ -86,10 +85,9 @@ export default function LoginPage() {
       const result = await signInWithEmailAndPassword(auth, loginEmail, password);
       const profile = await getDoc(doc(db, 'user', result.user.uid));
       const storedRole = profile.exists() ? profile.data().role : null;
-      const role = storedRole === 'worker' ? 'staff' : storedRole;
-      if (role !== 'admin' && role !== 'staff') {
+      if (storedRole !== 'admin') {
         await signOut(auth);
-        setError('This account has no assigned role. Ask the administrator to set it up.');
+        setError('This account is not an administrator.');
         return;
       }
       localStorage.setItem('skm_auth_session_expires_at', String(Date.now() + 24 * 60 * 60 * 1000));
@@ -122,11 +120,7 @@ export default function LoginPage() {
 
         <form onSubmit={submit} style={{ display: 'grid', gap: 12 }}>
           <label style={labelStyle}>Name
-            <select value={name} onChange={(event) => setName(event.target.value)} autoComplete="username" required style={inputStyle}>
-              <option value="siddica">Siddica</option>
-              <option value="kasim">Kasim</option>
-              <option value="ijaz">Ijaz</option>
-            </select>
+            <input type="text" value={name} onChange={(event) => setName(event.target.value)} autoComplete="username" required style={inputStyle} />
           </label>
           <label style={labelStyle}>Password
             <input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} style={inputStyle} />

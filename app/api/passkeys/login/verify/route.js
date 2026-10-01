@@ -1,5 +1,5 @@
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
-import { getPasskeyServices, validLoginName } from '@/lib/passkey-server';
+import { getPasskeyServices, requireAdmin, validLoginName } from '@/lib/passkey-server';
 
 export const runtime = 'nodejs';
 
@@ -9,6 +9,7 @@ export async function POST(request) {
     const cleanName = validLoginName(name);
     const { adminAuth, adminDb } = getPasskeyServices();
     const user = await adminAuth.getUserByEmail(`${cleanName}@skm.local`);
+    await requireAdmin(adminDb, user.uid);
     const challengeRef = adminDb.collection('passkeyChallenges').doc(`login-${user.uid}`);
     const challengeDoc = await challengeRef.get();
     const challenge = challengeDoc.data();

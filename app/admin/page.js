@@ -21,6 +21,31 @@ export default function AdminPage() {
   const [editingCategory, setEditingCategory] = useState(null);
   const [categoryMsg, setCategoryMsg] = useState('');
 
+  // ── Neon → Local sync state ──
+  const [syncing,  setSyncing]  = useState(false);
+  const [syncMsg,  setSyncMsg]  = useState('');
+  const [syncStats, setSyncStats] = useState(null);
+
+  async function runSync() {
+    setSyncing(true);
+    setSyncMsg('');
+    setSyncStats(null);
+    try {
+      const res  = await fetch('/api/sync', { method: 'POST' });
+      const json = await res.json();
+      if (json.ok) {
+        setSyncMsg(json.message);
+        setSyncStats(json.synced);
+      } else {
+        setSyncMsg('❌ ' + (json.error || 'Sync failed'));
+      }
+    } catch (err) {
+      setSyncMsg('❌ ' + err.message);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function categoryIdFor(label) {
     const letters = label.toUpperCase().replace(/[^A-Z0-9]/g, '');
     let id = letters.slice(0, 2) || 'CT';
@@ -135,6 +160,54 @@ export default function AdminPage() {
     <>
       <Header backHref="/" title={isTa ? '🛡 நிர்வாகம்' : '🛡 Admin'} />
       <main className="wrap">
+
+        {/* ── Neon → Local Sync ── */}
+        <div className="settings-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h4 style={{ margin: 0 }}>🔄 Sync Neon → Local Backup</h4>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink3)' }}>
+                Pulls all data from Neon cloud and saves to your local PostgreSQL on this laptop.
+                Run this to keep your local backup up to date.
+              </p>
+            </div>
+            <button
+              onClick={runSync}
+              disabled={syncing}
+              style={{
+                background: syncing ? 'var(--ink3)' : 'var(--primary)',
+                color: '#fff', border: 'none', borderRadius: 9,
+                padding: '10px 22px', fontSize: 13, fontWeight: 700,
+                cursor: syncing ? 'not-allowed' : 'pointer', minHeight: 44,
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+              }}>
+              {syncing ? '⏳ Syncing…' : '🔄 Sync Now'}
+            </button>
+          </div>
+
+          {/* result message */}
+          {syncMsg && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 8,
+              background: syncMsg.startsWith('❌') ? '#fdecea' : '#E8F0E6',
+              color: syncMsg.startsWith('❌') ? 'var(--danger)' : 'var(--primary-dark)',
+              fontWeight: 600, fontSize: 13,
+            }}>
+              {syncMsg}
+            </div>
+          )}
+
+          {/* per-table counts */}
+          {syncStats && (
+            <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+              {Object.entries(syncStats).map(([table, count]) => (
+                <span key={table} style={{ fontSize: 12, color: 'var(--ink3)' }}>
+                  <b style={{ color: 'var(--ink)' }}>{count}</b> {table}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ── Stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 20 }}>
@@ -288,7 +361,7 @@ export default function AdminPage() {
 
           {editMode && (
             <div style={{ marginTop: 10, fontSize: 12, color: 'var(--ink3)' }}>
-              💡 Tip: changes save to Firestore and take effect on the Buy Milk page immediately.
+              💡 Tip: changes save to PostgreSQL and take effect on the Buy Milk page immediately.
             </div>
           )}
         </div>

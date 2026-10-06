@@ -5,8 +5,6 @@ import { useStore } from '@/lib/store';
 import { getProductCategory, matchesSearch, generateProductId, normalizeSearchText } from '@/lib/helpers';
 import { exportInventory, parseImportFile } from '@/lib/inventoryExcel';
 import { getProductName } from '@/lib/translations';
-import { doc, setDoc, writeBatch } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 export default function InventoryPage() {
   const { inventory, categories, addInventoryItem, updateInventoryItem, deleteInventoryItem, lang } = useStore();
@@ -79,28 +77,30 @@ export default function InventoryPage() {
     const categoryChanged = newCatId !== oldCatId;
 
     if (categoryChanged) {
-      // ── Category changed → delete old doc, create new one with new productId ──
-      // Generate next available ID in the new category
       const allIds = inventory
-        .filter((p) => p.id !== editItem.id) // exclude the current item
-        .map((p) => p.productId)
+        .filter((p) => p.id !== editItem.id)
+        .map((p) => p.product_id || p.productId)
         .filter(Boolean);
       const newProductId = generateProductId(newCatId, allIds, categories);
 
       const newData = {
-        productId:  newProductId,
+        product_id: newProductId,
         name:       form.name.trim(),
-        altName:    (form.altName || form.name).trim(),
+        alt_name:   (form.altName || form.name).trim(),
         unit:       form.unit,
         category:   newCatId,
+        ...(form.price && !isNaN(form.price) && Number(form.price) > 0 ? { price: Number(form.price) } : {}),
       };
-      if (form.price && !isNaN(form.price) && Number(form.price) > 0) {
-        newData.price = Number(form.price);
-      }
 
-      // Create new doc first, then delete old
-      await setDoc(doc(db, 'inventory', newProductId), newData);
-      await deleteInventoryItem(editItem.id);
+      // POST new product then delete old via store
+      const res = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newData),
+      });
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error);
+      await deleteInventoryItem(editItem.product_id || editItem.id);
     } else {
       // ── Same category → just update the existing doc ──
       const updates = {
@@ -112,11 +112,10 @@ export default function InventoryPage() {
       if (form.price && !isNaN(form.price) && Number(form.price) > 0) {
         updates.price = Number(form.price);
       }
-      // Allow manual productId override only when category hasn't changed
       if (form.productId && form.productId.trim().toUpperCase() !== editItem.productId) {
         updates.productId = form.productId.trim().toUpperCase();
       }
-      await updateInventoryItem(editItem.id, updates);
+      await updateInventoryItem(editItem.product_id || editItem.id, updates);
     }
 
     setEditItem(null);
@@ -154,32 +153,39 @@ export default function InventoryPage() {
     setImportMsg(isTa ? 'பொருட்கள் சேமிக்கப்படுகிறது…' : 'Saving products…');
 
     try {
-      const operations = [
-        ...importPreview.toUpdate.map((item) => ({
-          type: 'update', ref: doc(db, 'inventory', item.firestoreId), data: item.updates,
-        })),
-        ...importPreview.toAdd.map((item) => ({
-          type: 'set', ref: doc(db, 'inventory', item.productId), data: item,
-        })),
-      ];
-      const batchSize = 500;
-      const batchCount = Math.ceil(operations.length / batchSize);
+      const total = importPreview.toUpdate.length + importPreview.toAdd.length;
+      let done = 0;
 
-      for (let start = 0; start < operations.length; start += batchSize) {
-        const batch = writeBatch(db);
-        const chunk = operations.slice(start, start + batchSize);
-        chunk.forEach((operation) => {
-          if (operation.type === 'update') batch.update(operation.ref, operation.data);
-          else batch.set(operation.ref, operation.data);
+      // Updates — PUT /api/inventory
+      for (const item of importPreview.toUpdate) {
+        await fetch('/api/inventory', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_id: item.firestoreId, ...item.updates }),
         });
-        const currentBatch = start / batchSize + 1;
-        setImportMsg(isTa
-          ? `பொருட்கள் சேமிக்கப்படுகிறது… (${currentBatch}/${batchCount})`
-          : `Saving products… (${currentBatch}/${batchCount})`);
-        await batch.commit();
+        done++;
+        setImportMsg(isTa ? `சேமிக்கிறது… (${done}/${total})` : `Saving… (${done}/${total})`);
       }
 
-      setImportMsg(isTa ? `✓ ${operations.length} பொருட்கள் வெற்றிகரமாக இறக்குமதி செய்யப்பட்டன!` : `✓ Successfully imported ${operations.length} products!`);
+      // Adds — POST /api/inventory
+      for (const item of importPreview.toAdd) {
+        await fetch('/api/inventory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id: item.productId,
+            name:       item.name,
+            alt_name:   item.altName,
+            price:      item.price ?? null,
+            unit:       item.unit,
+            category:   item.category,
+          }),
+        });
+        done++;
+        setImportMsg(isTa ? `சேமிக்கிறது… (${done}/${total})` : `Saving… (${done}/${total})`);
+      }
+
+      setImportMsg(isTa ? `✓ ${total} பொருட்கள் வெற்றிகரமாக இறக்குமதி செய்யப்பட்டன!` : `✓ Successfully imported ${total} products!`);
       setImportPreview(null);
       setTimeout(() => setImportMsg(''), 4000);
     } catch (err) {

@@ -2,11 +2,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
+
+/* ── pg helpers ── */
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || `${method} ${path} failed`);
+  return j.data;
+}
 
 /* ── constants ── */
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Not fixed'];
@@ -114,27 +120,23 @@ export default function AgencyOrderApp() {
   const [draggedLineId, setDraggedLineId] = useState(null);
   const [orderView, setOrderView] = useState('all');
 
-  // Firestore Realtime Listener
-  useEffect(() => {
-    const q = query(collection(db, 'agencies'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list = snapshot.docs.map((d) => ({
-          id: d.id,
-          products: [],
-          ...d.data()
-        }));
-        setAgencies(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error fetching agencies:', err);
-        setLoading(false);
-      }
-    );
-    return () => unsubscribe();
+  // ── Load agencies from PostgreSQL, poll every 8 s ──
+  const load = useCallback(async () => {
+    try {
+      const list = await api('GET', '/api/agencies');
+      setAgencies(list || []);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching agencies:', err);
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, [load]);
 
   const showToast = useCallback((msg) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -178,40 +180,30 @@ export default function AgencyOrderApp() {
     e.preventDefault();
     const name = aName.trim();
     if (!name || isSavingAgency) return;
-
     try {
       setIsSavingAgency(true);
       if (editingId) {
-        await updateDoc(doc(db, 'agencies', editingId), {
-          name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay
-        });
+        await api('PUT', `/api/agencies?id=${editingId}`, { type: 'agency', name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay });
         showToast(isTa ? '✓ ஏஜென்சி புதுப்பிக்கப்பட்டது' : '✓ Agency updated');
       } else {
-        await addDoc(collection(db, 'agencies'), {
-          name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay,
-          products: [], created: Date.now()
-        });
+        await api('POST', '/api/agencies', { type: 'agency', name, phone: aPhone.trim(), person: aPerson.trim(), day: aDay });
         showToast(isTa ? '✓ ஏஜென்சி சேர்க்கப்பட்டது' : '✓ Agency added');
       }
       setAgencyModal(false);
-    } catch (err) {
-      alert('Error saving agency: ' + err.message);
-    } finally {
-      setIsSavingAgency(false);
-    }
+      await load();
+    } catch (err) { alert('Error saving agency: ' + err.message); }
+    finally { setIsSavingAgency(false); }
   }
 
   async function deleteAgency(id) {
     const a = agency(id);
     if (!a) return;
     if (!confirm(isTa ? `"${a.name}" ஏஜென்சியை நீக்கவா?` : `Delete agency "${a.name}" and all its products?`)) return;
-
     try {
-      await deleteDoc(doc(db, 'agencies', id));
+      await api('DELETE', `/api/agencies?id=${id}&type=agency`);
       showToast(isTa ? 'ஏஜென்சி நீக்கப்பட்டது' : 'Agency deleted');
-    } catch (err) {
-      alert('Error deleting agency: ' + err.message);
-    }
+      await load();
+    } catch (err) { alert('Error deleting agency: ' + err.message); }
   }
 
   /* ── product CRUD ── */
@@ -221,10 +213,7 @@ export default function AgencyOrderApp() {
     productOrderRef.current = order;
     setProductOrder(order);
     setDraggedProductId(null);
-    setPName('');
-    setPUnit('');
-    setPWhole('');
-    setPRetail('');
+    setPName(''); setPUnit(''); setPWhole(''); setPRetail('');
     setEditingProductId(null);
     setProductModal(true);
   }
@@ -237,67 +226,41 @@ export default function AgencyOrderApp() {
     setPRetail(String(product.retail ?? ''));
   }
 
-  function clearProductForm() {
-    setEditingProductId(null);
-    setPName('');
-    setPUnit('');
-    setPWhole('');
-    setPRetail('');
-  }
+  function clearProductForm() { setEditingProductId(null); setPName(''); setPUnit(''); setPWhole(''); setPRetail(''); }
 
   async function addProduct(e) {
     e.preventDefault();
     const name = pName.trim();
     if (!name || !productAgencyId || isSavingProduct) return;
-
-    const a = agency(productAgencyId);
-    if (!a) return;
-
-    const product = {
-      id: editingProductId || uid(),
-      name,
-      unit: pUnit.trim() || 'pcs',
-      wholesale: +pWhole || 0,
-      retail: +pRetail || 0
-    };
-
+    const productId = editingProductId || uid();
     try {
       setIsSavingProduct(true);
-      const updatedProducts = editingProductId
-        ? (a.products || []).map((p) => p.id === editingProductId ? product : p)
-        : [...(a.products || []), product];
-      await updateDoc(doc(db, 'agencies', productAgencyId), { products: updatedProducts });
-      if (!editingProductId) {
-        const nextOrder = [...productOrderRef.current, product.id];
+      if (editingProductId) {
+        await api('PUT', `/api/agencies?id=${productId}`, { type: 'product', name, unit: pUnit.trim() || 'pcs', wholesale: +pWhole || 0, retail: +pRetail || 0 });
+      } else {
+        await api('POST', '/api/agencies', { type: 'product', id: productId, agency_id: productAgencyId, name, unit: pUnit.trim() || 'pcs', wholesale: +pWhole || 0, retail: +pRetail || 0, sort_order: (agency(productAgencyId)?.products || []).length });
+        const nextOrder = [...productOrderRef.current, productId];
         productOrderRef.current = nextOrder;
         setProductOrder(nextOrder);
       }
       clearProductForm();
-      showToast(editingProductId
-        ? (isTa ? '✓ பொருள் புதுப்பிக்கப்பட்டது' : '✓ Product updated')
-        : (isTa ? '✓ பொருள் சேர்க்கப்பட்டது' : '✓ Product added'));
-    } catch (err) {
-      alert('Error adding product: ' + err.message);
-    } finally {
-      setIsSavingProduct(false);
-    }
+      showToast(editingProductId ? (isTa ? '✓ பொருள் புதுப்பிக்கப்பட்டது' : '✓ Product updated') : (isTa ? '✓ பொருள் சேர்க்கப்பட்டது' : '✓ Product added'));
+      await load();
+    } catch (err) { alert('Error adding product: ' + err.message); }
+    finally { setIsSavingProduct(false); }
   }
 
   async function deleteProduct(agencyId, prodId) {
-    const a = agency(agencyId);
-    if (!a) return;
     if (!confirm(isTa ? 'இந்த பொருளை நீக்கவா?' : 'Remove this product?')) return;
     try {
-      const updatedProducts = (a.products || []).filter((p) => p.id !== prodId);
-      await updateDoc(doc(db, 'agencies', agencyId), { products: updatedProducts });
+      await api('DELETE', `/api/agencies?id=${prodId}&type=product`);
       const nextOrder = productOrderRef.current.filter((id) => id !== prodId);
       productOrderRef.current = nextOrder;
       setProductOrder(nextOrder);
       if (editingProductId === prodId) clearProductForm();
       showToast(isTa ? 'பொருள் நீக்கப்பட்டது' : 'Product removed');
-    } catch (err) {
-      alert('Error removing product: ' + err.message);
-    }
+      await load();
+    } catch (err) { alert('Error removing product: ' + err.message); }
   }
 
   function reorderProduct(productId, targetProductId) {
@@ -320,11 +283,14 @@ export default function AgencyOrderApp() {
     const productsById = new Map((a.products || []).map((product) => [product.id, product]));
     const reorderedProducts = [
       ...order.map((id) => productsById.get(id)).filter(Boolean),
-      ...(a.products || []).filter((product) => !order.includes(product.id))
+      ...(a.products || []).filter((product) => !order.includes(product.id)),
     ];
     setAgencies((current) => current.map((item) => item.id === productAgencyId ? { ...item, products: reorderedProducts } : item));
     try {
-      await updateDoc(doc(db, 'agencies', productAgencyId), { products: reorderedProducts });
+      await api('PUT', `/api/agencies?id=${productAgencyId}`, {
+        type: 'product_order',
+        products: reorderedProducts.map((p, i) => ({ id: p.id, sort_order: i })),
+      });
     } catch (err) {
       alert('Error saving product order: ' + err.message);
     }
@@ -682,7 +648,7 @@ export default function AgencyOrderApp() {
               {loading ? 'Loading agencies...' : 'No agencies yet'}
             </h3>
             <p style={{ margin: '0 0 16px', fontSize: 14 }}>
-              {loading ? 'Please wait while data is synced with Firebase.' : 'Add the agencies that supply your shop, then list their products with wholesale and retail prices.'}
+              {loading ? 'Please wait while data is loading…' : 'Add the agencies that supply your shop, then list their products with wholesale and retail prices.'}
             </p>
             {!loading && (
               <button onClick={() => openAgency(null)} style={brandBtn}>+ Add your first agency</button>
@@ -1013,3 +979,4 @@ const sheetHeaderStyle = { display: 'flex', alignItems: 'center', justifyContent
 const sheetFooterStyle = { padding: '16px 22px', borderTop: '1px solid rgba(122,84,48,.18)', display: 'flex', gap: 10, justifyContent: 'flex-end', flexWrap: 'wrap', background: 'rgba(255,251,244,.95)' };
 const thStyle = { fontSize: 11, textTransform: 'uppercase', letterSpacing: '.8px', color: '#8a6a4f', padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', background: 'rgba(255,251,244,.6)' };
 const tdStyle = { padding: '10px 12px', borderBottom: '1px solid rgba(122,84,48,.18)', fontSize: 14 };
+

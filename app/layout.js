@@ -6,8 +6,16 @@ export const metadata = {
   description: 'Billing & Inventory',
   manifest: '/manifest.webmanifest',
   icons: {
-    icon: [{ url: '/skm-logo.png', type: 'image/png', sizes: '512x512' }],
-    apple: [{ url: '/skm-logo.png', type: 'image/png', sizes: '512x512' }],
+    icon: [
+      { url: '/skm-logo.png', type: 'image/png', sizes: '192x192' },
+      { url: '/skm-logo.png', type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [
+      { url: '/skm-logo.png', type: 'image/png', sizes: '180x180' },
+      { url: '/skm-logo.png', type: 'image/png', sizes: '192x192' },
+      { url: '/skm-logo.png', type: 'image/png', sizes: '512x512' },
+    ],
+    shortcut: [{ url: '/skm-logo.png', type: 'image/png' }],
   },
   appleWebApp: {
     capable: true,

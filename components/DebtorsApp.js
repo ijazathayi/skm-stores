@@ -2,11 +2,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-  collection, onSnapshot, addDoc, doc, updateDoc, deleteDoc, query, orderBy
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useStore } from '@/lib/store';
+
+/* ── pg helpers ── */
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!j.ok) throw new Error(j.error || `${method} ${path} failed`);
+  return j.data;
+}
 
 /* ── helpers ── */
 const today = () => new Date().toISOString().slice(0, 10);
@@ -84,37 +90,27 @@ export default function DebtorsApp({ customerId = null }) {
   const [isSubmittingPay, setIsSubmittingPay] = useState(false);
   const [messageMode, setMessageMode] = useState('summary');
 
-  // Firestore Realtime Listeners
-  useEffect(() => {
-    const unsubCust = onSnapshot(
-      query(collection(db, 'debtors_customers'), orderBy('name', 'asc')),
-      (snapshot) => {
-        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setCustomers(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error fetching debtors customers:', err);
-        setLoading(false);
-      }
-    );
-
-    const unsubEntries = onSnapshot(
-      collection(db, 'debtors_entries'),
-      (snapshot) => {
-        const list = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setEntries(list);
-      },
-      (err) => {
-        console.error('Error fetching debtors entries:', err);
-      }
-    );
-
-    return () => {
-      unsubCust();
-      unsubEntries();
-    };
+  // ── Load customers + entries from PostgreSQL, poll every 8 s ──
+  const load = useCallback(async () => {
+    try {
+      const [custs, ents] = await Promise.all([
+        api('GET', '/api/debtors?type=customers'),
+        api('GET', '/api/debtors?type=entries'),
+      ]);
+      setCustomers(custs || []);
+      setEntries((ents || []).map((e) => ({ ...e, customerId: e.customer_id })));
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching debtors:', err);
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 8000);
+    return () => clearInterval(t);
+  }, [load]);
 
   // Compute stats
   const totalDebt = entries.filter((e) => e.kind === 'debt').reduce((t, e) => t + (Number(e.amount) || 0), 0);
@@ -163,25 +159,18 @@ export default function DebtorsApp({ customerId = null }) {
   /* ── Customer CRUD ── */
   async function registerCustomer(e) {
     e.preventDefault();
-    const name = custName.trim();
+    const name   = custName.trim();
     const mobile = custMobile.trim();
     if (!name || isSubmittingCust) return;
-
     try {
       setIsSubmittingCust(true);
-      const docRef = await addDoc(collection(db, 'debtors_customers'), {
-        name,
-        mobile,
-        createdAt: new Date().toISOString()
-      });
-      setSelectedId(docRef.id);
+      const newCust = await api('POST', '/api/debtors', { type: 'customer', name, mobile });
+      setSelectedId(newCust.id);
       setCustName('');
       setCustMobile('');
-    } catch (err) {
-      alert('Error registering customer: ' + err.message);
-    } finally {
-      setIsSubmittingCust(false);
-    }
+      await load();
+    } catch (err) { alert('Error registering customer: ' + err.message); }
+    finally { setIsSubmittingCust(false); }
   }
 
   function startEditingCustomer() {
@@ -190,54 +179,39 @@ export default function DebtorsApp({ customerId = null }) {
     setEditCustomerMobile(currentCustomer.mobile || '');
     setIsEditingCustomer(true);
   }
-
-  function cancelEditingCustomer() {
-    setIsEditingCustomer(false);
-    setEditCustomerName('');
-    setEditCustomerMobile('');
-  }
+  function cancelEditingCustomer() { setIsEditingCustomer(false); setEditCustomerName(''); setEditCustomerMobile(''); }
 
   async function saveCustomerDetails(e) {
     e.preventDefault();
     if (!selectedId || isSavingCustomer) return;
-    const name = editCustomerName.trim();
+    const name   = editCustomerName.trim();
     const mobile = editCustomerMobile.trim();
-    if (!name) {
-      alert(isTa ? 'வாடிக்கையாளர் பெயரை உள்ளிடவும்' : 'Enter a customer name');
-      return;
-    }
-
+    if (!name) { alert(isTa ? 'வாடிக்கையாளர் பெயரை உள்ளிடவும்' : 'Enter a customer name'); return; }
     try {
       setIsSavingCustomer(true);
-      await updateDoc(doc(db, 'debtors_customers', selectedId), { name, mobile });
+      await api('PUT', `/api/debtors?id=${selectedId}`, { type: 'customer', name, mobile });
       cancelEditingCustomer();
-    } catch (err) {
-      alert('Error updating customer: ' + err.message);
-    } finally {
-      setIsSavingCustomer(false);
-    }
+      await load();
+    } catch (err) { alert('Error updating customer: ' + err.message); }
+    finally { setIsSavingCustomer(false); }
   }
 
   async function deleteDebtEntry(entry) {
     if (!window.confirm('Delete this ledger entry permanently?')) return;
     try {
-      await deleteDoc(doc(db, 'debtors_entries', entry.id));
-    } catch (err) {
-      alert('Error deleting ledger entry: ' + err.message);
-    }
+      await api('DELETE', `/api/debtors?id=${entry.id}&type=entry`);
+      await load();
+    } catch (err) { alert('Error deleting ledger entry: ' + err.message); }
   }
 
   async function deleteCustomer() {
     if (!currentCustomer) return;
     if (!window.confirm(`Delete ${currentCustomer.name} and all of this customer's ledger entries?`)) return;
     try {
-      const customerEntries = entries.filter((entry) => entry.customerId === currentCustomer.id);
-      await Promise.all(customerEntries.map((entry) => deleteDoc(doc(db, 'debtors_entries', entry.id))));
-      await deleteDoc(doc(db, 'debtors_customers', currentCustomer.id));
+      await api('DELETE', `/api/debtors?id=${currentCustomer.id}&type=customer`);
       setSelectedId(null);
-    } catch (err) {
-      alert('Error deleting customer: ' + err.message);
-    }
+      await load();
+    } catch (err) { alert('Error deleting customer: ' + err.message); }
   }
 
   /* ── Debt / Payment CRUD ── */
@@ -245,63 +219,37 @@ export default function DebtorsApp({ customerId = null }) {
     e.preventDefault();
     if (!selectedId || isSubmittingDebt) return;
     const amount = Number(debtAmount);
-    if (!amount || amount <= 0) {
-      alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount');
-      return;
-    }
-
-    const productName = debtProduct.trim();
-    const entryDate = debtDate || today();
-
+    if (!amount || amount <= 0) { alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount'); return; }
     try {
       setIsSubmittingDebt(true);
-      await addDoc(collection(db, 'debtors_entries'), {
-        customerId: selectedId,
-        kind: 'debt',
-        product: productName,
-        qty: debtQty.trim() || '',
-        amount,
-        date: entryDate,
-        note: debtNote.trim() || '',
-        timestamp: new Date().toISOString()
+      await api('POST', '/api/debtors', {
+        type: 'entry', customer_id: selectedId, kind: 'debt',
+        product: debtProduct.trim(), qty: debtQty.trim() || '',
+        amount, date: debtDate || today(), note: debtNote.trim() || '',
+        timestamp: new Date().toISOString(),
       });
-      setDebtProduct('');
-      setDebtQty('');
-      setDebtAmount('');
-      setDebtNote('');
-    } catch (err) {
-      alert('Error adding debt: ' + err.message);
-    } finally {
-      setIsSubmittingDebt(false);
-    }
+      setDebtProduct(''); setDebtQty(''); setDebtAmount(''); setDebtNote('');
+      await load();
+    } catch (err) { alert('Error adding debt: ' + err.message); }
+    finally { setIsSubmittingDebt(false); }
   }
 
   async function addPayment(e) {
     e.preventDefault();
     if (!selectedId || isSubmittingPay) return;
     const amount = Number(payAmount);
-    if (!amount || amount <= 0) {
-      alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount');
-      return;
-    }
-
+    if (!amount || amount <= 0) { alert(isTa ? 'சரியான தொகையை உள்ளிடவும்' : 'Enter valid amount'); return; }
     try {
       setIsSubmittingPay(true);
-      await addDoc(collection(db, 'debtors_entries'), {
-        customerId: selectedId,
-        kind: 'payment',
-        amount,
-        date: payDate || today(),
-        note: payNote.trim() || '',
-        timestamp: new Date().toISOString()
+      await api('POST', '/api/debtors', {
+        type: 'entry', customer_id: selectedId, kind: 'payment',
+        amount, date: payDate || today(), note: payNote.trim() || '',
+        timestamp: new Date().toISOString(),
       });
-      setPayAmount('');
-      setPayNote('');
-    } catch (err) {
-      alert('Error recording payment: ' + err.message);
-    } finally {
-      setIsSubmittingPay(false);
-    }
+      setPayAmount(''); setPayNote('');
+      await load();
+    } catch (err) { alert('Error recording payment: ' + err.message); }
+    finally { setIsSubmittingPay(false); }
   }
 
   function getMessageDetails() {
@@ -454,7 +402,7 @@ export default function DebtorsApp({ customerId = null }) {
               {isTa ? 'எஸ்.கே.எம் ஸ்டோர்ஸ்' : 'SKM Stores'}
             </p>
             <p style={{ margin: '2px 0 0', fontSize: 11, letterSpacing: '.18em', textTransform: 'uppercase', color: '#8a6a4f' }}>
-              {isTa ? 'கடன் புத்தகம்' : 'Debtors Book'} {loading ? '• Loading...' : '• Synced Live'}
+              {isTa ? 'கடன் புத்தகம்' : 'Debtors Book'} {loading ? '• Loading...' : '• PostgreSQL'}
             </p>
           </div>
         </div>

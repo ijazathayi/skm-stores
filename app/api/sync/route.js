@@ -8,10 +8,14 @@ import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
 export async function POST(request) {
-  // Optional secret check — prevents random internet calls to this endpoint
-  const secret = request.headers.get('x-sync-secret') || '';
+  // Secret check — only enforced when called from outside (e.g. remote trigger)
+  // Localhost calls (Admin button) are always allowed
+  const secret   = request.headers.get('x-sync-secret') || '';
   const expected = process.env.SYNC_SECRET || '';
-  if (expected && secret !== expected) {
+  const host     = request.headers.get('host') || '';
+  const isLocal  = host.includes('localhost') || host.includes('127.0.0.1');
+
+  if (!isLocal && expected && secret !== expected) {
     return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
   }
 

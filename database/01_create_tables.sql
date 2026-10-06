@@ -1,3 +1,4 @@
+
 -- ============================================================
 --  SKM STORES — PostgreSQL Schema
 --  Run this in pgAdmin → SKM_STORES database → Query Tool

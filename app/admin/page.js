@@ -26,6 +26,35 @@ export default function AdminPage() {
   const [syncMsg,  setSyncMsg]  = useState('');
   const [syncStats, setSyncStats] = useState(null);
 
+  // ── Cloud backup state ──
+  const [backingUp,  setBackingUp]  = useState(false);
+  const [backupMsg,  setBackupMsg]  = useState('');
+  const [backupInfo, setBackupInfo] = useState(null);
+
+  async function pushBackup() {
+    setBackingUp(true);
+    setBackupMsg('');
+    setBackupInfo(null);
+    try {
+      const res  = await fetch('/api/backup', { method: 'POST' });
+      const json = await res.json();
+      if (json.ok) {
+        setBackupMsg(json.message);
+        setBackupInfo({ file: json.file, url: json.url, counts: json.counts, exportedAt: json.exportedAt });
+      } else {
+        setBackupMsg('❌ ' + (json.error || 'Backup failed'));
+      }
+    } catch (err) {
+      setBackupMsg('❌ ' + err.message);
+    } finally {
+      setBackingUp(false);
+    }
+  }
+
+  function downloadBackup() {
+    window.open('/api/backup', '_blank');
+  }
+
   async function runSync() {
     setSyncing(true);
     setSyncMsg('');
@@ -205,6 +234,78 @@ export default function AdminPage() {
                   <b style={{ color: 'var(--ink)' }}>{count}</b> {table}
                 </span>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Cloud Backup ── */}
+        <div className="settings-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h4 style={{ margin: 0 }}>☁️ Cloud Backup</h4>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--ink3)' }}>
+                Backup runs automatically every day at midnight. You can also push or download manually anytime.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                onClick={downloadBackup}
+                style={{
+                  background: 'var(--card)', color: 'var(--primary-dark)',
+                  border: '1.5px solid var(--border)', borderRadius: 9,
+                  padding: '9px 18px', fontSize: 13, fontWeight: 700,
+                  cursor: 'pointer', minHeight: 44,
+                }}>
+                ⬇️ Download
+              </button>
+              <button
+                onClick={pushBackup}
+                disabled={backingUp}
+                style={{
+                  background: backingUp ? 'var(--ink3)' : '#1a7f37',
+                  color: '#fff', border: 'none', borderRadius: 9,
+                  padding: '9px 20px', fontSize: 13, fontWeight: 700,
+                  cursor: backingUp ? 'not-allowed' : 'pointer', minHeight: 44,
+                }}>
+                {backingUp ? '⏳ Pushing…' : '☁️ Push to GitHub'}
+              </button>
+            </div>
+          </div>
+
+          {/* result message */}
+          {backupMsg && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 8,
+              background: backupMsg.startsWith('❌') ? '#fdecea' : '#E8F0E6',
+              color: backupMsg.startsWith('❌') ? 'var(--danger)' : 'var(--primary-dark)',
+              fontWeight: 600, fontSize: 13,
+            }}>
+              {backupMsg}
+            </div>
+          )}
+
+          {/* backup details */}
+          {backupInfo && (
+            <div style={{ marginTop: 10 }}>
+              {backupInfo.url && (
+                <a
+                  href={backupInfo.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ fontSize: 12, color: 'var(--primary)', display: 'block', marginBottom: 6 }}>
+                  📁 {backupInfo.file}
+                </a>
+              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+                {backupInfo.counts && Object.entries(backupInfo.counts).map(([table, count]) => (
+                  <span key={table} style={{ fontSize: 12, color: 'var(--ink3)' }}>
+                    <b style={{ color: 'var(--ink)' }}>{count}</b> {table.replace(/_/g, ' ')}
+                  </span>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--ink3)', marginTop: 4 }}>
+                Backed up at {new Date(backupInfo.exportedAt).toLocaleString()}
+              </div>
             </div>
           )}
         </div>

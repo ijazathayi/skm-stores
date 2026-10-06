@@ -7,7 +7,14 @@
 import { NextResponse } from 'next/server';
 import { Pool } from 'pg';
 
-export async function POST() {
+export async function POST(request) {
+  // Optional secret check — prevents random internet calls to this endpoint
+  const secret = request.headers.get('x-sync-secret') || '';
+  const expected = process.env.SYNC_SECRET || '';
+  if (expected && secret !== expected) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
   if (!process.env.DATABASE_URL_LOCAL) {
     return NextResponse.json({
       ok: false,

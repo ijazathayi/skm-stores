@@ -7,14 +7,169 @@ import { printReceiptBluetooth, supportsBluetoothPrinting } from '@/lib/bluetoot
 import { getProductCategory, matchesSearch, money, normalizeSearchText } from '@/lib/helpers';
 import { getProductName, t } from '@/lib/translations';
 
+/* ── Quick-Add Dialog ──────────────────────────────────────────
+   Shows when user taps a product tile. Lets them set qty/price
+   before adding to cart — same UI as cart item rows (images 3 & 4).
+─────────────────────────────────────────────────────────────── */
+function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
+  const isTa = lang === 'ta';
+  const defaultPrice = product?.price ? String(product.price) : '';
+  const defaultUnit  = product?.unit === 'kg' ? 'kg' : 'pcs';
+
+  const [unit,   setUnit]   = useState(defaultUnit);
+  const [qty,    setQty]    = useState(unit === 'kg' ? '' : '1');
+  const [price,  setPrice]  = useState(defaultPrice);
+  const [budget, setBudget] = useState('');
+
+  // recalc qty from budget when kg mode
+  const isKg       = unit === 'kg';
+  const kgQty      = isKg && Number(price) > 0 && Number(budget) > 0
+    ? (Number(budget) / Number(price)).toFixed(3)
+    : '';
+  const displayQty = isKg ? kgQty : qty;
+  const lineAmt    = (Number(displayQty) || 0) * (Number(price) || 0);
+  const displayName = getProductName(product, lang);
+
+  const handleConfirm = () => {
+    onConfirm({
+      qty:    isKg ? String(kgQty || 0) : qty,
+      price:  price,
+      unit:   unit,
+      budget: budget,
+    });
+  };
+
+  // close on backdrop click
+  const onBackdrop = (e) => { if (e.target === e.currentTarget) onClose(); };
+
+  return (
+    <div className="quick-add-overlay" onClick={onBackdrop}>
+      <div className="quick-add-sheet">
+        {/* handle bar (mobile) */}
+        <div className="quick-add-handle" />
+
+        {/* product name + unit badge + close */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+          <div>
+            <div className="quick-add-name">{displayName}</div>
+            {isVeg && (
+              <div style={{ fontSize: 11, color: 'var(--success)', fontWeight: 700, marginBottom: 4 }}>
+                {isTa ? 'இன்றைய விலை' : "Today's price"}
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} style={{
+            background: 'var(--paper)', border: 'none', borderRadius: '50%',
+            width: 32, height: 32, cursor: 'pointer', fontSize: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--ink3)', flexShrink: 0,
+          }}>✕</button>
+        </div>
+
+        {/* unit badge */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          {product?.unit === 'both' ? (
+            <div style={{ display: 'inline-flex', border: '1.5px solid var(--border)', borderRadius: 999, overflow: 'hidden' }}>
+              {['pcs', 'kg'].map((u) => (
+                <button key={u} onClick={() => { setUnit(u); setQty(u === 'kg' ? '' : '1'); setBudget(''); }}
+                  style={{
+                    border: 'none', padding: '5px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    background: unit === u ? 'var(--primary)' : 'transparent',
+                    color: unit === u ? '#fff' : 'var(--ink3)',
+                  }}>
+                  {isTa ? (u === 'kg' ? 'கிலோ' : 'எண்ணிக்கை') : u}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <span className="quick-add-unit-badge">
+              {isTa ? (defaultUnit === 'kg' ? 'கிலோ' : 'எண்ணிக்கை') : defaultUnit}
+            </span>
+          )}
+          {product?.price && (
+            <span style={{ fontSize: 13, color: 'var(--ink3)', fontWeight: 600 }}>
+              ₹{Number(product.price).toFixed(2)} / {isKg ? 'kg' : 'pc'}
+            </span>
+          )}
+        </div>
+
+        {/* qty + price row — mirrors cart item UI */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: isKg ? 12 : 20 }}>
+          {/* qty stepper (pcs) or display (kg) */}
+          {!isKg ? (
+            <div className="qty-stepper">
+              <button onClick={() => setQty((v) => String(Math.max((Number(v) || 1) - 1, 1)))}>−</button>
+              <input type="text" inputMode="numeric" value={qty}
+                onChange={(e) => setQty(e.target.value)} />
+              <button onClick={() => setQty((v) => String((Number(v) || 0) + 1))}>+</button>
+            </div>
+          ) : (
+            <div className="qty-stepper" style={{ background: 'var(--paper)', opacity: 0.7 }}>
+              <button disabled style={{ opacity: .4 }}>−</button>
+              <input type="text" inputMode="decimal" value={kgQty || '0'} readOnly
+                style={{ color: 'var(--ink3)' }} />
+              <button disabled style={{ opacity: .4 }}>+</button>
+            </div>
+          )}
+
+          {/* price */}
+          <div className="cart-price-wrap" style={{ flex: 1 }}>
+            <span style={{ fontSize: 14, color: 'var(--ink3)', flexShrink: 0 }}>₹</span>
+            <input type="text" inputMode="decimal" placeholder={isTa ? 'விலை' : 'price'}
+              value={price} onChange={(e) => setPrice(e.target.value)} />
+          </div>
+
+          {/* line total */}
+          <span style={{
+            fontFamily: "'SFMono-Regular',Consolas,monospace", fontSize: 17,
+            fontWeight: 800, color: 'var(--primary)', whiteSpace: 'nowrap',
+          }}>
+            {money(lineAmt)}
+          </span>
+        </div>
+
+        {/* kg budget row */}
+        {isKg && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap' }}>
+              {isTa ? 'வாடிக்கையாளர் ₹' : 'Customer ₹'}
+            </span>
+            <div style={{
+              display: 'flex', alignItems: 'center', border: '1.5px solid var(--border)',
+              borderRadius: 12, background: 'var(--paper)', padding: '0 12px', height: 48, flex: 1, maxWidth: 160,
+            }}>
+              <input type="text" inputMode="decimal" placeholder="e.g. 50" value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: 16, color: 'var(--ink)', padding: 0, height: 48 }} />
+            </div>
+            {Number(kgQty) > 0 && (
+              <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-soft)', borderRadius: 8, padding: '4px 10px' }}>
+                ≈ {(Number(kgQty) * 1000).toFixed(0)} {isTa ? 'கிராம்' : 'g'}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Add to Cart button */}
+        <button className="btn-primary" style={{ width: '100%' }} onClick={handleConfirm}>
+          {isTa ? 'கூடையில் சேர்' : 'Add to Cart'} {lineAmt > 0 ? `· ${money(lineAmt)}` : ''}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function BillPage() {
-  const { inventory, categories, vegPrices, cart, editingBill, addToCart, bills, storeProfile, lang, editBill, cartTotal } = useStore();
+  const { inventory, categories, vegPrices, cart, editingBill, addToCart, updateCartItem, bills, storeProfile, lang, editBill, cartTotal } = useStore();
   const isTa = lang === 'ta';
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [lastBill, setLastBill] = useState(null);
   const [sortMode, setSortMode] = useState('popular');
+
+  // ── quick-add dialog state ──
+  const [quickAdd, setQuickAdd] = useState(null); // { product, isVeg }
 
   useEffect(() => {
     if (editingBill) setDrawerOpen(true);
@@ -58,6 +213,23 @@ export default function BillPage() {
   const handleComplete = async (bill) => {
     setLastBill(bill);
     setDrawerOpen(false);
+  };
+
+  // ── open quick-add dialog ──
+  const openQuickAdd = (product, isVeg = false) => {
+    setQuickAdd({ product, isVeg });
+  };
+
+  // ── user confirmed quick-add → add to cart with qty/price already set ──
+  const handleQuickConfirm = ({ qty, price, unit, budget }) => {
+    const { product, isVeg } = quickAdd;
+    addToCart(
+      isVeg ? null : product.id,
+      product.name,
+      isVeg ? product.id : null,
+      { qty, price, unit, budget }   // extra options passed through
+    );
+    setQuickAdd(null);
   };
 
   const handleEditLastBill = () => {
@@ -113,7 +285,7 @@ export default function BillPage() {
                 const displayName = getProductName(m, lang);
                 return (
                   <button key={m.id} className="suggest-item"
-                    onClick={() => { addToCart(isVeg ? null : m.id, m.name, isVeg ? m.id : null); setSearch(''); }}>
+                    onClick={() => { openQuickAdd(m, isVeg); setSearch(''); }}>
                     <span style={{ fontWeight: 600 }}>{displayName}</span>
                     {m.price && <span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--ink3)' }}>₹{Number(m.price).toFixed(2)}</span>}
                     {isVeg && <span style={{ marginLeft: 6, fontSize: 10.5, color: 'var(--success)', fontWeight: 700 }}>{isTa ? 'இன்றைய விலை' : "Today's price"}</span>}
@@ -172,7 +344,7 @@ export default function BillPage() {
                 return (
                   <button key={m.id}
                     className={`product-tile${inCart ? ' in-cart' : ''}`}
-                    onClick={() => addToCart(isVeg ? null : m.id, m.name, isVeg ? m.id : null)}>
+                    onClick={() => openQuickAdd(m, isVeg)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, width: '100%' }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.25, wordBreak: 'break-word' }}>{displayName}</div>
@@ -271,6 +443,17 @@ export default function BillPage() {
 
       {/* Cart Drawer */}
       <CartDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onComplete={handleComplete} />
+
+      {/* Quick-Add Dialog */}
+      {quickAdd && (
+        <QuickAddDialog
+          product={quickAdd.product}
+          isVeg={quickAdd.isVeg}
+          lang={lang}
+          onConfirm={handleQuickConfirm}
+          onClose={() => setQuickAdd(null)}
+        />
+      )}
     </>
   );
 }

@@ -1,10 +1,18 @@
 import { NextResponse } from 'next/server';
 import { query, write } from '@/lib/pgdb';
 
+function serializeRow(row) {
+  const out = { ...row };
+  for (const [k, v] of Object.entries(out)) {
+    if (v instanceof Date) out[k] = v.toISOString().slice(0, 10);
+  }
+  return out;
+}
+
 export async function GET() {
   try {
     const result = await query('SELECT * FROM restock_items ORDER BY bought ASC, added_at DESC');
-    return NextResponse.json({ ok: true, data: result.rows });
+    return NextResponse.json({ ok: true, data: result.rows.map(serializeRow) });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }

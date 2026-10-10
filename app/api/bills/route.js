@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { query, write, transaction } from '@/lib/pgdb';
 
+function serializeRow(row) {
+  const out = { ...row };
+  for (const [k, v] of Object.entries(out)) {
+    if (v instanceof Date) out[k] = v.toISOString().slice(0, 10);
+  }
+  return out;
+}
+
 export async function GET() {
   try {
     const [billsResult, itemsResult] = await Promise.all([
@@ -10,9 +18,9 @@ export async function GET() {
     const itemsByBillId = {};
     itemsResult.rows.forEach((item) => {
       if (!itemsByBillId[item.bill_id]) itemsByBillId[item.bill_id] = [];
-      itemsByBillId[item.bill_id].push(item);
+      itemsByBillId[item.bill_id].push(serializeRow(item));
     });
-    const bills = billsResult.rows.map((b) => ({ ...b, items: itemsByBillId[b.id] || [] }));
+    const bills = billsResult.rows.map((b) => ({ ...serializeRow(b), items: itemsByBillId[b.id] || [] }));
     return NextResponse.json({ ok: true, data: bills });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });

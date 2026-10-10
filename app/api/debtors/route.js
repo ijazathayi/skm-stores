@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
 import { query, write } from '@/lib/pgdb';
 
+// Serialize PostgreSQL DATE objects to YYYY-MM-DD strings
+function serializeRow(row) {
+  const out = { ...row };
+  for (const [k, v] of Object.entries(out)) {
+    if (v instanceof Date) {
+      // DATE columns → YYYY-MM-DD, TIMESTAMPTZ → ISO string
+      out[k] = v.toISOString().slice(0, 10);
+    }
+  }
+  return out;
+}
+
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -10,10 +22,10 @@ export async function GET(request) {
       const result = customerId
         ? await query('SELECT * FROM ledger_entries WHERE customer_id=$1 ORDER BY date ASC, timestamp ASC', [customerId])
         : await query('SELECT * FROM ledger_entries ORDER BY date ASC, timestamp ASC');
-      return NextResponse.json({ ok: true, data: result.rows });
+      return NextResponse.json({ ok: true, data: result.rows.map(serializeRow) });
     }
     const result = await query('SELECT * FROM customers ORDER BY name ASC');
-    return NextResponse.json({ ok: true, data: result.rows });
+    return NextResponse.json({ ok: true, data: result.rows.map(serializeRow) });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
   }

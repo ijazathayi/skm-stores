@@ -20,9 +20,12 @@ const money = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
 const fmtDate = (d) => {
   if (!d) return '—';
   try {
-    return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+    // Handle both Date objects and YYYY-MM-DD strings from PostgreSQL
+    const dateObj = d instanceof Date ? d : new Date(String(d).includes('T') ? d : d + 'T00:00:00');
+    if (isNaN(dateObj.getTime())) return String(d) || '—';
+    return dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
   } catch {
-    return d;
+    return String(d) || '—';
   }
 };
 const initials = (name) =>

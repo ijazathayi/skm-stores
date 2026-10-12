@@ -18,29 +18,42 @@ function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
 
   const [unit,   setUnit]   = useState(defaultUnit);
   const [qty,    setQty]    = useState(unit === 'kg' ? '' : '1');
-  const [price,  setPrice]  = useState(defaultPrice);
-  const [budget, setBudget] = useState('');
+  const [price,       setPrice]       = useState(defaultPrice);
+  const [budget,      setBudget]      = useState('');
+  const [kgQtyInput,  setKgQtyInput]  = useState(''); // direct kg input
 
-  // recalc qty from budget when kg mode
-  const isKg       = unit === 'kg';
-  const kgQty      = isKg && Number(price) > 0 && Number(budget) > 0
+  const isKg = unit === 'kg';
+
+  // For kg: qty comes from direct input OR calculated from budget
+  // Direct input takes priority; budget auto-calculates qty
+  const kgFromBudget = isKg && Number(price) > 0 && Number(budget) > 0 && !kgQtyInput
     ? (Number(budget) / Number(price)).toFixed(3)
     : '';
-  const displayQty = isKg ? kgQty : qty;
-  const lineAmt    = (Number(displayQty) || 0) * (Number(price) || 0);
-  const displayName = getProductName(product, lang);
+  const resolvedKgQty = kgQtyInput || kgFromBudget;
+  const displayQty    = isKg ? resolvedKgQty : qty;
+  const lineAmt       = (Number(displayQty) || 0) * (Number(price) || 0);
+  const displayName   = getProductName(product, lang);
 
   const handleConfirm = () => {
     onConfirm({
-      qty:    isKg ? String(kgQty || 0) : qty,
-      price:  price,
-      unit:   unit,
-      budget: budget,
+      qty:    isKg ? String(resolvedKgQty || 0) : qty,
+      price,
+      unit,
+      budget,
     });
   };
 
-  // close on backdrop click
-  const onBackdrop = (e) => { if (e.target === e.currentTarget) onClose(); };
+  // When user types budget, clear the direct kg input so budget drives qty
+  const handleBudgetChange = (v) => {
+    setBudget(v);
+    setKgQtyInput(''); // let budget recalculate
+  };
+
+  // When user types kg directly, clear budget
+  const handleKgQtyChange = (v) => {
+    setKgQtyInput(v);
+    setBudget(''); // manual kg overrides budget
+  };
 
   return (
     <div className="quick-add-overlay" onClick={onBackdrop}>
@@ -93,9 +106,9 @@ function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
           )}
         </div>
 
-        {/* qty + price row — mirrors cart item UI */}
+        {/* qty + price row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: isKg ? 12 : 20 }}>
-          {/* qty stepper (pcs) or display (kg) */}
+          {/* qty — editable for BOTH pcs and kg */}
           {!isKg ? (
             <div className="qty-stepper">
               <button onClick={() => setQty((v) => String(Math.max((Number(v) || 1) - 1, 1)))}>−</button>
@@ -104,11 +117,24 @@ function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
               <button onClick={() => setQty((v) => String((Number(v) || 0) + 1))}>+</button>
             </div>
           ) : (
-            <div className="qty-stepper" style={{ background: 'var(--paper)', opacity: 0.7 }}>
-              <button disabled style={{ opacity: .4 }}>−</button>
-              <input type="text" inputMode="decimal" value={kgQty || '0'} readOnly
-                style={{ color: 'var(--ink3)' }} />
-              <button disabled style={{ opacity: .4 }}>+</button>
+            /* kg — user can type weight directly e.g. 0.250 */
+            <div className="qty-stepper">
+              <button onClick={() => {
+                const cur = Number(resolvedKgQty) || 0;
+                handleKgQtyChange(String(Math.max(cur - 0.25, 0).toFixed(3)));
+              }}>−</button>
+              <input
+                type="text"
+                inputMode="decimal"
+                placeholder="kg"
+                value={kgQtyInput || kgFromBudget}
+                onChange={(e) => handleKgQtyChange(e.target.value)}
+                style={{ width: 64 }}
+              />
+              <button onClick={() => {
+                const cur = Number(resolvedKgQty) || 0;
+                handleKgQtyChange(String((cur + 0.25).toFixed(3)));
+              }}>+</button>
             </div>
           )}
 
@@ -128,7 +154,7 @@ function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
           </span>
         </div>
 
-        {/* kg budget row */}
+        {/* kg — Customer ₹ budget row (optional, alternative to typing kg directly) */}
         {isKg && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, color: 'var(--ink3)', whiteSpace: 'nowrap' }}>
@@ -139,12 +165,12 @@ function QuickAddDialog({ product, isVeg, lang, onConfirm, onClose }) {
               borderRadius: 12, background: 'var(--paper)', padding: '0 12px', height: 48, flex: 1, maxWidth: 160,
             }}>
               <input type="text" inputMode="decimal" placeholder="e.g. 50" value={budget}
-                onChange={(e) => setBudget(e.target.value)}
+                onChange={(e) => handleBudgetChange(e.target.value)}
                 style={{ border: 'none', outline: 'none', background: 'transparent', width: '100%', fontSize: 16, color: 'var(--ink)', padding: 0, height: 48 }} />
             </div>
-            {Number(kgQty) > 0 && (
+            {Number(resolvedKgQty) > 0 && (
               <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 700, background: 'var(--primary-soft)', borderRadius: 8, padding: '4px 10px' }}>
-                ≈ {(Number(kgQty) * 1000).toFixed(0)} {isTa ? 'கிராம்' : 'g'}
+                ≈ {(Number(resolvedKgQty) * 1000).toFixed(0)} {isTa ? 'கிராம்' : 'g'}
               </span>
             )}
           </div>
